@@ -1,6 +1,74 @@
+#This clustering removes contigs that have reads in a representative contig!
+clusterMultiMappingReads_stringent = function( contigForCountingGR_unclustered, allReads, readCompositionIdentity = 0.95 ){
+#   tmp1 = allReads
+#   tmp2 = contigForCountingGR_unclustered
+#   
+#   allReads = import(bamFileL[[1]], 
+#                     format="BED", asRangedData=FALSE)#alignedbwt_s.bed
+#   start(allReads) = start(allReads) - 1 #Strange behaviour in import of rtracklayer!
+#   currBamFile = 1
+  
+  contigForCountingGR_unclustered = contigForCountingGR_unclustered[order(contigForCountingGR_unclustered$uniqueness, contigForCountingGR_unclustered$readCount, decreasing=TRUE)]
+  overlapMap = findOverlaps( contigForCountingGR_unclustered, allReads )  
+  
+  if( length(unique(queryHits(overlapMap))) != length(contigForCountingGR_unclustered) ){
+    warning("Some contigs have zero reads in in one sample within a group, therefore these contigs are removed from the analysis! 
+            One could avoid this by intersecting all bam files with the contig files")
+    contigForCountingGR_unclustered = contigForCountingGR_unclustered[ unique(queryHits(overlapMap) )]
+    overlapMap = findOverlaps( contigForCountingGR_unclustered, allReads )      
+  }
+    
+  allClustered = TRUE
+  clusteredContigs = GRanges()
+  while(allClustered){
+    if( length( overlapMap) == 0 ){
+      break;
+    }
+    idx = 1
+    currContig = queryHits(overlapMap[idx])
+    currReads = subjectHits( overlapMap[ which(queryHits(overlapMap) == currContig) ] ) #Take first entry of overlap matrix to compare
+    contigReadNames = unique(allReads[currReads]$name)     #get all subject Hits (reads) for this contig
+    
+    allReadPositions = which( allReads$name %in% contigReadNames ) #gets the positions in the BED file (all Reads) for the reads of the contig!
+    contigClusterIdx = queryHits(overlapMap)[subjectHits(overlapMap) %in% allReadPositions]#finds all other contigs containing these reads
+    
+    contigCluster = contigForCountingGR_unclustered[contigClusterIdx]
+    toBeClusteredTo = which(contigCluster$readCount == max(contigCluster$readCount))# Fetching the contig with the highest read count!
+    toBeClusteredTo = toBeClusteredTo[which( width(contigForCountingGR_unclustered[contigClusterIdx[toBeClusteredTo]]) == max( width(contigForCountingGR_unclustered[contigClusterIdx[toBeClusteredTo]]) ) )][1]#from the contigs with the highest read count taking the longest one!
+    
+    #Adding the contig to the set of clustered contigs!
+    clusteredContigs = append(clusteredContigs, contigCluster[toBeClusteredTo])
+
+    #contigForCountingGR_unclustered[contigClusterIdx[toBeClusteredTo]]
+    
+    readsFromRepContig = subjectHits(overlapMap[queryHits(overlapMap) == contigClusterIdx[toBeClusteredTo]]) #These are all reads from the representative contig!
+    repContigReadNames = unique(allReads[readsFromRepContig]$name) 
+    allReadPositionsRepContig = which( allReads$name %in% repContigReadNames )
+    #From the representative contig all reads are obtained and eliminated from the overlapMap (therefore if another contig would consist 100% of the same reads it will get eliminated)
+    #Otherwise the contig will be kept and may be of interest -> one could delete some further contigs by x percent...
+    
+    overlapMap_filt =  overlapMap[which( !subjectHits(overlapMap) %in% allReadPositionsRepContig)]#This would be the filtered overlapMap!
+    #check for contig leftovers...
+    #Filtering by 95% read composition identity!
+    leftoverContigs = table( queryHits(overlapMap_filt[ queryHits( overlapMap_filt ) %in% unique(contigClusterIdx)]))
+    filtered_leftoverContigs = names(leftoverContigs[ifelse( 1 - (leftoverContigs / (contigCluster[toBeClusteredTo]$readCount + leftoverContigs) ) >= readCompositionIdentity , TRUE, FALSE )]) #left with less than 95% of the reads in main cluster!
+    overlapMap_filt = overlapMap_filt[which(!queryHits(overlapMap_filt) %in% filtered_leftoverContigs)]
+        
+    overlapMap = overlapMap_filt
+  }
+  return(clusteredContigs)
+}
+
+
+
+
+
+
+
+
 
 #This clustering removes contigs that have reads in a representative contig!
-clusterMultiMappingReads_stringent = function( contigForCountingGR_unclustered, allReads ){
+clusterMultiMappingReads_stringent_deprecated = function( contigForCountingGR_unclustered, allReads ){
   overlapMap = findOverlaps( contigForCountingGR_unclustered, allReads )  
   if( length(unique(queryHits(overlapMap))) != length(contigForCountingGR_unclustered) ){
     stop("The Clusters MUST Map all the reads provided! (This is achieved by intersection of all files for contig assembly!)as")
