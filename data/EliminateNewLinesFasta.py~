@@ -47,11 +47,11 @@ class FastaUtils():
         for line in f:
             if fastaSign.match(line) != None:
                 if removeWhiteSpaceFlag:
-                    fw.writelines( "\n" + toStrip.sub("_",line) + "\n" )
+                    fw.writelines( "\n" + toStrip.sub("",line) + "\n" )
                 else:
                     fw.writelines("\n" + line)
             else:    
-                fw.writelines(  toStrip.sub("",line) )
+                fw.writelines(  toStrip.sub("_",line) )
         f.close()
         fw.close()
         return 1

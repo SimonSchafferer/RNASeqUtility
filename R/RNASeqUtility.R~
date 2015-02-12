@@ -1,3 +1,41 @@
+
+##Code for Count table generation for clustering
+generateCountUnclusteredTable = function( contigFile, sampleBedFiles ){
+  overallContigPath = file.path( getOutFilePath(getCLIApplication(contigFile)), getOutResultName(getOutResultReference(contigFile)) )
+  overallContig = read.table(overallContigPath, sep="\t", header=FALSE)
+  colnames(overallContig)  = c("chr","start","end","ID","score","strand")
+  overallContig = overallContig[order(overallContig$ID),]
+  overallContig = overallContig[,c("chr","start","end","ID","strand")]
+  
+  mergedDF = do.call( cbind, mapply( function(x, y){
+    mergedFilePath = file.path( getOutFilePath(getCLIApplication(x)), getOutResultName(getOutResultReference(x)) )
+    
+    mergedFile = read.table(mergedFilePath, sep="\t", header=FALSE)
+    colnames(mergedFile)  = c("chr","start","end","ReadCount","Uniqueness","strand","ID")
+    mergedFile = mergedFile[,c("ReadCount","Uniqueness","ID")]
+    #Could be that there are the same IDs that have not been merged, due to the -d restriction (but the contigs are longer due to group intersection )..
+    #Therefore these have to be merged -> this unfortunately may take some time since R is not the fastest with iterating
+    idL = split(mergedFile, mergedFile$ID )
+    mergedFile = do.call(rbind,lapply( idL, function(x){ 
+      x[1,"ReadCount"] = sum( x[,1] );
+      x[1,"Uniqueness"] = mean( x[,2] );
+      return(x[1,]) 
+      } ) )
+    
+    mergedTable = merge(x = overallContig, y = mergedFile[,c("ReadCount","Uniqueness","ID")], by = "ID", all.x = TRUE)
+    mergedTable = mergedTable[order(mergedTable$ID),]
+    
+    mergedTable = mergedTable[,c("ReadCount","Uniqueness")]
+    colnames( mergedTable ) = paste0(colnames( mergedTable ),"_",y)
+    
+    return(mergedTable)
+  }, sampleBedFiles, samplesInfo$sampleName, SIMPLIFY = FALSE ))
+  
+  overallContig = cbind(overallContig, mergedDF)
+  return(overallContig)
+}
+
+
 #CODE FOR ncRNA DATABASE CREATION FOR RNASTAR mapping
 #ftp://ftp.ensembl.org/pub/release-78/fasta/homo_sapiens/ncrna/
 createSizeSelectedEnsemblncRNADB = function(genomeDBdir="/tmp/mmu", ncRNAsize=400, nrThreads=6, ensemblFTP="mouse"){
@@ -14,7 +52,7 @@ createSizeSelectedEnsemblncRNADB = function(genomeDBdir="/tmp/mmu", ncRNAsize=40
   cmd2 = paste0("gunzip ", file.path(genomeDBdir,archiveFN))
   message(paste0("Unzip file:\n", cmd2))
   system(cmd2)
-  fastaFN = list.files(path="/tmp/mmu", pattern = ".*.fa")
+  fastaFN = list.files(path=genomeDBdir, pattern = ".*.fa")
   fastaModFN = paste0(sub(".fa$","",fastaFN),".mod.fa")
   cmd3 = paste0( "python ",file.path( system.file( package="RNASeqUtility"), "data", "EliminateNewLinesFasta.py"), " -i ",file.path(genomeDBdir,fastaFN),
                  " -o ",file.path(genomeDBdir,fastaModFN) )

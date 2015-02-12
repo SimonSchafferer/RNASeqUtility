@@ -1,4 +1,21 @@
 
+#Subsetting Samples
+extractRandomReadSet = function(numberOfReads=50000, rawDataOldDir, rawDataNewDir){
+  require(ShortRead)
+  setwd(rawDataOldDir)
+  allFastq = list.files()
+  
+  tmp = lapply(allFastq, function(x){
+    message("... Sampling reads ....")
+    sampler <- FastqSampler(x, numberOfReads)
+    set.seed(123); currSample = yield(sampler)
+    currSample
+    writeFastq(currSample, file.path(rawDataNewDir,x) )
+    message( paste0("writing to:\n", file.path(rawDataNewDir,x) ))
+  })
+}
+
+
 ##Code for Count table generation for clustering
 generateCountUnclusteredTable = function( contigFile, sampleBedFiles ){
   overallContigPath = file.path( getOutFilePath(getCLIApplication(contigFile)), getOutResultName(getOutResultReference(contigFile)) )
@@ -52,7 +69,7 @@ createSizeSelectedEnsemblncRNADB = function(genomeDBdir="/tmp/mmu", ncRNAsize=40
   cmd2 = paste0("gunzip ", file.path(genomeDBdir,archiveFN))
   message(paste0("Unzip file:\n", cmd2))
   system(cmd2)
-  fastaFN = list.files(path="/tmp/mmu", pattern = ".*.fa")
+  fastaFN = list.files(path=genomeDBdir, pattern = ".*.fa")
   fastaModFN = paste0(sub(".fa$","",fastaFN),".mod.fa")
   cmd3 = paste0( "python ",file.path( system.file( package="RNASeqUtility"), "data", "EliminateNewLinesFasta.py"), " -i ",file.path(genomeDBdir,fastaFN),
                  " -o ",file.path(genomeDBdir,fastaModFN) )

@@ -1,0 +1,7 @@
+
+require(RNASeqUtility)
+extractRandomReadSet(numberOfReads=50000, rawDataOldDir = "/home/simon/PHDStudies/RNA-Seq/IonProton/Alzheimer_postmortemBrain/rawData", 
+                     rawDataNewDir = "/home/simon/PHDStudies/RNA-Seq/IonProton/Alzheimer_postmortemBrain/SampleAnalysisTesting/rawData")
+
+
+
