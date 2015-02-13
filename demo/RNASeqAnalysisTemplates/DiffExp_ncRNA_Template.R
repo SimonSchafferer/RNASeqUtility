@@ -128,7 +128,9 @@ png(filename = file.path(diffExpDir,"DESeq_DispersionEstimation.png"))
 plotDispEsts(cds)
 dev.off()
 
-res = nbinomTest(cds,condA = "AD", condB="WT")
+conditionsNbinom = unique(samplesInfo$condition)
+
+res = nbinomTest(cds,condA = conditionsNbinom[1], condB=conditionsNbinom[2])
 
 png(filename = file.path(diffExpDir,"DESeq_MA.png"))
 plotMA(res)
