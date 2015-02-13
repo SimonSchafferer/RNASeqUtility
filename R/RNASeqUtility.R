@@ -1,9 +1,19 @@
 
-#Subsetting Samples
+
+#' @title Randomly extract reads from fastq
+#'
+#' @description Extract a random subset of reads from fastq files. The files have to be in the 
+#' same directory, since the method gets all fastq files from a directory and iterates through them. 
+#' @param numberOfReads The number of reads one wants to extract (default: 50000)
+#' @param rawDataOldDir The path to the fastq files from which the random subset is extracted
+#' @param rawDataNewDir The path to the new sampled fastq files
+#' @return returns TRUE
+#' @docType methods
+#' @export
 extractRandomReadSet = function(numberOfReads=50000, rawDataOldDir, rawDataNewDir){
   require(ShortRead)
   setwd(rawDataOldDir)
-  allFastq = list.files()
+  allFastq = list.files(pattern=".fastq$")
   
   tmp = lapply(allFastq, function(x){
     message("... Sampling reads ....")
@@ -13,9 +23,22 @@ extractRandomReadSet = function(numberOfReads=50000, rawDataOldDir, rawDataNewDi
     writeFastq(currSample, file.path(rawDataNewDir,x) )
     message( paste0("writing to:\n", file.path(rawDataNewDir,x) ))
   })
+  return(TRUE)
 }
 
 
+#' @title Helper method for clustering in MappAssClust_ncRNA_Template.R object
+#'
+#' @description Not intended for general use, just a helper method for MappAssClust_ncRNA_Template.R
+#' The method will merge the contig file generated from multiIntersect perl script with 
+#' all the contigs that have been intersected with -wb option to the multiIntersected file and merged afterwards. 
+#' Please see MappAssClust_ncRNA_Template.R, default inputs: multiIntersectBed_perl_CLI_cmdRes, mergeBedFile_CLI_cmdResL
+#'
+#' @param contigFile CmdResult object is needed as input
+#' @param sampleBedFiles CmdResult object is needed as input
+#' @return data.frame (Unclustered)
+#' @docType methods
+#' @export
 ##Code for Count table generation for clustering
 generateCountUnclusteredTable = function( contigFile, sampleBedFiles ){
   overallContigPath = file.path( getOutFilePath(getCLIApplication(contigFile)), getOutResultName(getOutResultReference(contigFile)) )
@@ -52,10 +75,23 @@ generateCountUnclusteredTable = function( contigFile, sampleBedFiles ){
   return(overallContig)
 }
 
-
+#' @title Generate ncRNA database for rnastarMapping
+#'
+#' @description This method downloads ensembl ncRNA data if provided with ftp adress, modifies the fasta file, 
+#' subsets the fasta file to sequences of a given and generates a STAR index file if wanted. 
+#'
+#' @param genomeDBdir Location to where the database should be saved
+#' @param ncRNAsize maximum sequence length of the fasta file (default 400nt)
+#' @param nrThreads Number of threads for the rnastar program (default 6)
+#' @param ensemblFTP ftp adress e.g. ftp://ftp.ensembl.org/pub/release-78/fasta/mus_musculus/ncrna/, however for convenience for mouse and human the ftp sites are stored and
+#' either 'mouse' or 'human' may be used for parametrization
+#' @param generateIdx Specification if an rnastar index should be created (default FALSE)
+#' @return all commands generated
+#' @docType methods
+#' @export
 #CODE FOR ncRNA DATABASE CREATION FOR RNASTAR mapping
 #ftp://ftp.ensembl.org/pub/release-78/fasta/homo_sapiens/ncrna/
-createSizeSelectedEnsemblncRNADB = function(genomeDBdir="/tmp/mmu", ncRNAsize=400, nrThreads=6, ensemblFTP="mouse"){
+createSizeSelectedEnsemblncRNADB = function(genomeDBdir="/tmp/mmu", ncRNAsize=400, nrThreads=6, ensemblFTP="mouse", generateIdx=FALSE){
   dir.create(genomeDBdir)
   if( ensemblFTP == "mouse" ){
     ensemblFTP = "ftp://ftp.ensembl.org/pub/release-78/fasta/mus_musculus/ncrna/"
@@ -82,15 +118,38 @@ createSizeSelectedEnsemblncRNADB = function(genomeDBdir="/tmp/mmu", ncRNAsize=40
   message(paste0("Restricting fasta to:\n",ncRNAsize," sequences ", cmd4))
   system(cmd4)
   setwd(restrictedDir)
+
   cmd5 = paste0( "STAR --runThreadN ", nrThreads," --runMode genomeGenerate --genomeDir ",restrictedDir," --genomeFastaFiles ",file.path(restrictedDir, fastaModFN_restricted))
-  message(paste0("Creating IndexDB with star:\n", cmd5))
-  system(cmd5)
+  if(generateIdx){
+    message(paste0("Creating IndexDB with star:\n", cmd5))
+    system(cmd5)    
+  }
+  commands = c(cmd1,cmd2,cmd3,cmd4,cmd5)
   #return the new index directory
-  return( restrictedDir )
+  return( commands )
   
 }
 
 
+
+#' @title Clustering of contigs 
+#'
+#' @description Contigs that contain reads that match to multiple locations are clustered to the contig with the highest read count. 
+#' If more contigs have the same read count, the longest of them is chosen and then the first one in the list. 
+#' Starting with the first contig (sorted by read count and length) in the unclustered list:
+#' All contigs containing a read of the chosen contig are reported. 
+#' If these contigs are composed by x% (readCompositionIdentity) of reads from the 
+#' representative contig, they are removed from the list, including the representative contig. 
+#' The representative contig is stored in the clustered list. 
+#' Then the next contig of the unclustered list is chosen, until the unclustered list is empty.
+#'
+#' @param contigForCountingGR_unclustered GRanges object of unclustered contigs
+#' @param allReads GRanges object of the single reads (obtained from each sample in bed format with bamToBed)
+#' @param readCompositionIdentity The percentage of read similarity of contigs that need to be reached in order to get clustered (default 0.95)
+#' When 0 is specified than one shared read leads to clustering/removing of non-representative contigs. 
+#' @return clustered GRanges object
+#' @docType methods
+#' @export
 #This clustering removes contigs that have reads in a representative contig!
 clusterMultiMappingReads_stringent = function( contigForCountingGR_unclustered, allReads, readCompositionIdentity = 0.95 ){
 #   tmp1 = allReads
@@ -159,7 +218,14 @@ clusterMultiMappingReads_stringent = function( contigForCountingGR_unclustered, 
 
 
 
-
+#' @title Deprecated version of clustering
+#'
+#' @description This method is deprecated do not use!
+#' @param contigForCountingGR_unclustered
+#' @param allReads
+#' @return clusteredContigs
+#' @docType methods
+#' @export
 #This clustering removes contigs that have reads in a representative contig!
 clusterMultiMappingReads_stringent_deprecated = function( contigForCountingGR_unclustered, allReads ){
   overlapMap = findOverlaps( contigForCountingGR_unclustered, allReads )  
