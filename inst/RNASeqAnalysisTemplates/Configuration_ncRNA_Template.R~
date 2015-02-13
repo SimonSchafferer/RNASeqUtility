@@ -9,7 +9,7 @@
 ######################################################
 
 #Base directory of the analysis
-rootDir = file.path( "/tmp","test","","","","","")#schaffrr
+rootDir = file.path( "/home","simon","PHDStudies","RNA-Seq","IonProton","Alzheimer_postmortemBrain","SampleAnalysisTesting")#schaffrr
 #Directory containging fastq files
 rawDataDir = file.path(rootDir,"rawData")
 
