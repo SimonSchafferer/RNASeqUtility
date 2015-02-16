@@ -91,7 +91,7 @@ switch(organismForAnnotation,
 
 library( genomeToAnnotate, character.only=TRUE)
 assign("bsgenome", eval(parse( text= genomeToAnnotate)) )
-
+seqlevelsStyle(bsgenome) = "UCSC" #This sets the chrodomosome coordinates from ENSEMBL to UCSC (1 to chr1) -> currently only relevant in case of BSgenome.Hsapiens.UCSC.hg38
 ##########################################################################################################################
 #                               Annotation of small ncRNAs that were mapped to ENSEMBL
 ##########################################################################################################################
@@ -138,7 +138,6 @@ ensReadsCountDF = do.call( cbind, lapply( ensReadCountL, function(x){
     if( xsize != 1 ){
       xnew$mapStart = min(as.numeric(x$mapStart))
       xnew$mapEnd = min(as.numeric(x$mapEnd))
-      #       xnew$mapWidth = as.numeric(xnew$mapEnd)-as.numeric(xnew$mapStart)+1
       xnew$readCount = sum(as.numeric(x$readCount),na.rm = TRUE)
       xnew$mapQ = mean(as.numeric(x$mapQ),na.rm = TRUE)
     }
@@ -165,9 +164,8 @@ ensReadsCountDF[,2:length(colnames(ensReadsCountDF))] = apply(ensReadsCountDF[,2
 ensReadsCountDF$mapStart = mapStart
 ensReadsCountDF$mapEnd = mapEnd
 
-#can nicely be clustered by the rfam ID!
 ##########################
-# Clustering
+# Clustering by RFAM ID (since RFAM is annotating ncRNA classes and not individual transcripts!)
 ##########################
 
 ensReadsCountDF$ensembl_transcript_id = sub("_.*$","",ensReadsCountDF$UID)
@@ -195,7 +193,6 @@ table(ensReadsCountDF_clustered$gene_biotype)
 ####################################
 #     Other ncRNAs (miRNAs, snoRNAs)
 ####################################
-
 otherncRNAReadCountL = lapply(ncRNAReadCountL, function(x){
   x[-grep("ENS.*",seqnames(x))]
 })
@@ -303,62 +300,48 @@ colnames( rpmskr_annotDF ) = paste0("r_",colnames( rpmskr_annotDF ))
 
 contigAnnotTable = cbind(ensembl_protCodAnnot, ensembl_featureAnnot, rpmskr_annotDF)
 contigAnnotTable$contigID = contigForCountingGR_clustered$name
+
 ##################################################
 #     Annotate with infernal
 ##################################################
-
 fastqForAnnotation = "contigSequences.fa"
 contigForCountingGR_clustered_seq = getSeq(bsgenome, contigForCountingGR_clustered)
 names(contigForCountingGR_clustered_seq) = contigForCountingGR_clustered$name
 #write fasta file: 
 writeLines( as.vector( t(cbind( paste0(">",names(contigForCountingGR_clustered_seq)), as.character(contigForCountingGR_clustered_seq)  )) ), con = file.path(annotationDir,fastqForAnnotation) )
 
-
-# #PUT RFAM INTO R PACAKGE -> ONLY 
-# ##### infernal runs
-# #cmscan --tblout tmp -E 20 --noali Rfam.cm.1_1 fastaFiles/testSeq.fa #NICELY PARSEABLE FILE -> PERL SCRIPT!
 ########### INFERNAL RUN ####################
 infernalOutFN = "contigAnnotation_infernal"
 setwd(annotationDir)
 cmd1 = paste0( "cmscan --tblout ",file.path(annotationDir, paste0(infernalOutFN,"_orig") ), " --noali --cpu 8 -E 20 ",infernalDB," ", file.path(annotationDir,fastqForAnnotation) )
+#AWK script to make the file parseable (different number of white spaces -> no csv possible from cmscan output)
 cmd2 = paste0( "awk -v OFS=\"\\t\" \'$1=$1\' ",file.path(annotationDir, paste0(infernalOutFN,"_orig") )," > ",file.path(annotationDir,infernalOutFN ) )
 
 #Running infernal
 system(cmd1)
 system(cmd2)
 
+#THESE colnames are hard coded from the infernal output, should remain the same -> check if infernal version changes!
 tmp = read.csv(file.path(annotationDir,infernalOutFN), sep="\t", header=FALSE, comment.char="#")
 cnames = c("targetName","accession","queryName","accession","mdl","mdlFrom","mdlTo","seqFrom","seqTo","strand","trunc","pass","gc","bias","score","Evalue","inc","descriptionOfTarget")
 colnames(tmp) = cnames
 bestMatch = tmp[which(!duplicated(tmp[,3])),]
-# bestMatch = bestMatch[bestMatch[,17]!="?",] may be too restrictive
+# bestMatch = bestMatch[bestMatch[,17]!="?",] may be too restrictive -> this can be done afterwards. The ! indicates a sound hit, wheareas the ? marks not sure
 descriptions = gsub( " {2,}.*$","", apply( bestMatch[,which(colnames(bestMatch) == "descriptionOfTarget"):dim(bestMatch)[2]], 1, function(x){paste0(x,collapse=" ")} ))
 bestMatch = bestMatch[,1:which(colnames(bestMatch) == "descriptionOfTarget")]
 bestMatch[,dim(bestMatch)[2]] = descriptions
 head(bestMatch)
 
 colnames(bestMatch) = paste0("inf_",colnames(bestMatch))
+#Merge the infernal annotations with the range based annotations
 contigAnnotTable_fin = merge( contigAnnotTable, bestMatch, by.x="contigID", by.y="inf_queryName", all.x=TRUE)
 
-# contigAnnotTable_fin[,c("f_feature_biotype","r_RepeatName","inf_targetName")]
-
+#Writing the contig annotation table
 write.table(contigAnnotTable_fin, file.path(annotationDir,"contigAnnotTable_fin.csv"),sep="\t",row.names=FALSE, col.names=TRUE )
 
-# ensReadsCountDF_clusteredGR = with( ensReadsCountDF_clustered, GRanges( seqnames=chromosome_name, 
-#                                                                         IRanges((start_position+mapStart-1),
-#                                                                                 (start_position+mapEnd-1)), strand=strand,
-#                                                                         ensembl_transcript_id, UID, ensembl_gene_id, 
-#                                                                         gene_biotype,external_gene_name,rfam,hgnc_symbol,clustered ))
-
-# findOverlaps(ensReadsCountDF_clusteredGR, contigForCountingGR_clustered)
-# ensReadsCountDF_clusteredGR[591]
-# contigForCountingGR_clustered[27]
-# contigAnnotTable_fin[contigAnnotTable_fin$contigID == "contig27",]
-# count_contigsGR[count_contigsGR$contigID %in% contigAnnotTable_fin[which(contigAnnotTable_fin$inf_targetName == "tmRNA"),]$contigID]
-
-# ###########################
+############################
 # load Coverage Matrix
-# ###########################
+############################
 count_contigsDF = read.table( file=file.path( getOutFilePath(getCLIApplication(multiBamCov_CLI_cmdRes)), getOutResultName(getOutResultReference(multiBamCov_CLI_cmdRes))), 
                               sep="\t", header=FALSE )
 colnames(count_contigsDF) = c("chr","start","end","contigID","uniqueness","strand",samplesInfo$sampleName)
@@ -366,4 +349,17 @@ count_contigsGR = with(count_contigsDF, GRanges(chr, IRanges(start, end), unique
                                                 count_contigsDF[,7:dim(count_contigsDF)[2]]))
 
 save.image(file.path(rootDir, "Annotation.rda"))
+
+
+#Testing
+# ensReadsCountDF_clusteredGR = with( ensReadsCountDF_clustered, GRanges( seqnames=chromosome_name, 
+#                                                                         IRanges((start_position+mapStart-1),
+#                                                                                 (start_position+mapEnd-1)), strand=strand,
+#                                                                         ensembl_transcript_id, UID, ensembl_gene_id, 
+#                                                                         gene_biotype,external_gene_name,rfam,hgnc_symbol,clustered ))
+# findOverlaps(ensReadsCountDF_clusteredGR, contigForCountingGR_clustered)
+# ensReadsCountDF_clusteredGR[591]
+# contigForCountingGR_clustered[27]
+# contigAnnotTable_fin[contigAnnotTable_fin$contigID == "contig27",]
+# count_contigsGR[count_contigsGR$contigID %in% contigAnnotTable_fin[which(contigAnnotTable_fin$inf_targetName == "tmRNA"),]$contigID]
 

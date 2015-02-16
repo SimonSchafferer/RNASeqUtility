@@ -212,3 +212,15 @@ save.image(file.path(rootDir,"Configuration.rda") )
 # call sncRNAannotation::createRObject_gtf function, or execute the steps in this function
 #############################################
 
+#############################################
+#         Prepare infernal covariance model
+#
+#cmbuild -> use RFam pre-build db
+#cmcalibrate [options] cmfile -> use RFam pre-build db
+#
+#  Start here when using the RFam pre-build db
+#Compress the CM database first to accelerate cmscan!
+# cmpress Rfam.cm.1_1
+# this will generate various files (Rfam.cm.1_1.i1f,...), that have to be put in a directory and the path and infernal base name (in this case Rfam.cm.1_1) to these files has to be provided
+# for the variable infernalDB
+#############################################
