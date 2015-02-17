@@ -6,6 +6,10 @@
 #' @docType methods
 #' @export
 summarizeContigAnnotation = function(contigDF){
+  currentlySupportedCols = c("contigID","g_gene_biotype","g_gene_type_ext","g_gene_name","r_repClass","r_repName","inf_targetName","inf_descriptionOfTarget")
+  if( !(colnames( contigDF ) %in% currentlySupportedCols) ){
+    stop( paste0("Please provide following columns in your input:\n ", paste0(currentlySupportedCols, collapse=" ") ) )    
+  }
   
   gene_type =  contigDF[,c("contigID","g_gene_biotype","g_gene_type_ext","g_gene_name")]
   gene_type$g_gene_biotype = with(gene_type, ifelse(is.na(g_gene_biotype),"none", g_gene_biotype) )
