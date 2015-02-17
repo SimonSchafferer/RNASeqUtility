@@ -1,3 +1,63 @@
+#' @title Summarize contig Annotation
+#'
+#' @description This method summarizes the contig annotation table by first checking for range based annotation then for rfam annotation then for repeat annotation 
+#' @param data.frame contig annotation table (contigAnnotTable_fin.csv)
+#' @return summarized contig annotation
+#' @docType methods
+#' @export
+summarizeContigAnnotation = function(contigDF){
+  
+  gene_type =  contigDF[,c("contigID","g_gene_biotype","g_gene_type_ext","g_gene_name")]
+  gene_type$g_gene_biotype = with(gene_type, ifelse(is.na(g_gene_biotype),"none", g_gene_biotype) )
+  gene_type$g_gene_name = with(gene_type, ifelse(is.na(g_gene_name),"not_annotated", g_gene_name) )
+  
+  #get the best feature annotation
+  #start with range based annotation, then go to repeat masker if infernal is ? -> else infernal first then repeat masker
+  featureAnnotType = c()
+  featureAnnotName = c()
+  
+  featureAnnotType = with(contigDF,  ifelse( 
+    #outer if statement 
+    contigDF$f_featureAnnot_short == "unknown", ifelse(contigDF$inf_inc == "!" ,
+                                                       sub( ".*small nucleolar RNA.*","snoRNA", sub(".*microRNA.*","miRNA",contigDF$inf_descriptionOfTarget, ignore.case=TRUE), ignore.case=TRUE ), 
+                                                       ifelse(!is.na(contigDF$r_repClass), 
+                                                              contigDF$r_repClass, "unknown")),
+    #outer else statement
+    contigDF$f_featureAnnot_short
+  ) )
+  
+  featureAnnotName = with(contigDF,  ifelse( 
+    #outer if statement 
+    contigDF$f_featureAnnot_short == "unknown", ifelse(contigDF$inf_inc == "!" ,
+                                                       contigDF$inf_targetName, 
+                                                       ifelse(!is.na(contigDF$r_repClass), 
+                                                              contigDF$r_repName, "unknown")),
+    #outer else statement
+    contigDF$f_feature_name
+  ) )
+  
+  # Long form for readability but this would need to be iterated with for loop -> slow in R!:  
+  #   if( contigDF$f_featureAnnot_short == "unknown" ){
+  #     
+  #     if( contigDF$inf_inc == "!" ){
+  #       featureAnnotType = c(featureAnnotType,sub( ".*small nucleolar RNA.* ","snoRNA", sub(".*microRNA.*","miRNA",contigDF$inf_descriptionOfTarget) ))
+  #       featureAnnotName = c(featureAnnotName,contigDF$inf_targetName)
+  #     } else if( !is.na(contigDF$r_repClass)  ){
+  #       featureAnnotType = c(featureAnnotType,contigDF$r_repClass)
+  #       featureAnnotName = c(featureAnnotName,contigDF$r_repName)
+  #     } else{
+  #       featureAnnotType = c(featureAnnotType,"unknown")
+  #       featureAnnotName = c(featureAnnotName,"unknown")
+  #     }
+  #     
+  #   } else{
+  #     featureAnnotType = c(featureAnnotType,contigDF$f_featureAnnot_short)
+  #     featureAnnotName = c(featureAnnotName,contigDF$f_feature_name) 
+  #   }    
+  gene_type$featureAnnotType = featureAnnotType
+  gene_type$featureAnnotName = featureAnnotName
+  return(gene_type)
+}
 
 
 #' @title Randomly extract reads from fastq

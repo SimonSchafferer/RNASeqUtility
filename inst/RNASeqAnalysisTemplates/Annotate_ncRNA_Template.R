@@ -338,6 +338,8 @@ contigAnnotTable_fin = merge( contigAnnotTable, bestMatch, by.x="contigID", by.y
 
 #Writing the contig annotation table
 write.table(contigAnnotTable_fin, file.path(annotationDir,"contigAnnotTable_fin.csv"),sep="\t",row.names=FALSE, col.names=TRUE )
+#Writing a summarized table: 
+write.table( summarizeContigAnnotation(contigAnnotTable_fin),file.path(annotationDir,"contigAnnotTable_fin_summarized.csv"),sep="\t",row.names=FALSE, col.names=TRUE )
 
 ############################
 # load Coverage Matrix
