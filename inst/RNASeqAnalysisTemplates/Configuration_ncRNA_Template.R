@@ -49,6 +49,9 @@ readCompositionIdentity = 0.95 #This is used for clustering: If 0.95: At least 9
 
 ####################################
 #     The paths to the command line programs should be set HERE!
+#
+#   
+#
 ####################################
 #This code greps all export PATH statement from the bashrc file
 pathvars = readLines(file.path(path.expand("~"),".bashrc"))

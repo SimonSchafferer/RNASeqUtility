@@ -1,0 +1,257 @@
+---
+title: "Differential Epression Analysis Template"
+author: "Simon Schafferer"
+date: '2015-02-20'
+output: html_document
+---
+````{r echo=FALSE, results = 'asis'}
+    cat("<link rel='stylesheet' href='http://dl.dropboxusercontent.com/u/61211913/nv.d3.css'>")
+    cat("<link rel='stylesheet' href='http://dl.dropboxusercontent.com/u/61211913/rNVD3.css'>")
+    cat("<script src='http://code.jquery.com/jquery-1.10.1.min.js' type='text/javascript'></script>")
+    cat("<script src='http://d3js.org/d3.v3.min.js' type='text/javascript'></script>")
+    cat("<script src='http://dl.dropboxusercontent.com/u/61211913/nv.d3.min-new.js' type='text/javascript'></script>")
+    cat("<script src='http://dl.dropboxusercontent.com/u/61211913/fisheye.js' type='text/javascript'></script>")
+```
+```{r setOptions, message=FALSE, echo=FALSE, warning=FALSE}
+library(googleVis)
+op <- options(gvis.plot.tag='chart')
+options(stringsAsFactors=FALSE)
+library(RNASeqUtility)
+require(rtracklayer)
+library("gplots")
+library("RColorBrewer")
+library(ggplot2)
+library(DESeq2)
+library("genefilter")
+library(ReportingTools)
+library(rCharts)
+```
+
+```{r preparation, echo=FALSE}
+#TESTING 
+load("/home/simon/PHDStudies/RNA-Seq/IonProton/Alzheimer_postmortemBrain/Annotation.rda")
+setwd(rootDir)
+args <- commandArgs(TRUE)
+if( length(args) == 0 ){
+  load( file.path(getwd(),"Configuration.rda") )
+} else{
+  load(file.path(args[1],"Configuration.rda"))
+}
+# load(file.path( rootDir,"Annotation.rda"))#
+
+groupsForPCAplot = "condition"
+firstConditionLvl = "WT" #It will be convenient to make sure that untrt is the first level in the dex factor, so that the default log2 fold changes are calculated as treated over untreated
+numberOfGenesToReport=50
+```
+
+#Differential Expression Analysis
+
+##Count Table creation
+```{r countTableCreation, echo=FALSE, eval=TRUE}
+#Preparation of the count table 
+rownames(count_contigsDF ) = count_contigsDF$contigID
+rownames(ensReadsCountDF_clustered ) = ensReadsCountDF_clustered$UID
+counts = ensReadsCountDF_clustered[,3:(2+length(samplesInfo$condition))]
+counts = rbind(counts, count_contigsDF[,7:dim(count_contigsDF)[2]])
+counts_tmp = as.data.frame(apply(counts, 2, as.numeric))
+rownames(counts_tmp) = rownames(counts)
+
+if( dim(otherReadsCountDF)[1] > 0 ){
+  otherReadsCountDF_tmp = otherReadsCountDF[, which( !colnames(otherReadsCountDF) %in% c("mapStart","mapEnd")  ) ]
+  otherReadsCountDF_tmp = otherReadsCountDF_tmp[,-1]
+  otherReadsCountDF_tmp = as.data.frame(apply(otherReadsCountDF_tmp, 2, as.numeric))
+  rownames(otherReadsCountDF_tmp) = otherReadsCountDF[,1]
+  counts_tmp = rbind( counts_tmp, otherReadsCountDF_tmp  )
+}
+counts = counts_tmp
+
+head(counts)
+```
+
+##DESeq2 - Creating the DESeqDataSet
+```{r DESeqDataSet, echo=TRUE, eval=TRUE}
+dds <- DESeqDataSetFromMatrix(countData = counts,
+                                 colData = samplesInfo,
+                                 design = ~ condition)
+```
+
+##Sample Info Table
+```{r samplesInfo, echo=TRUE, eval=TRUE}
+colData(dds)
+```
+
+##Transformation and inspection of count data
+
+The transformation is done by regularized-logarithm transformation (rlog) in order to derive approximate homoskedastic data
+```{r, echo=FALSE}
+rld <- rlog(dds)
+head(assay(rld))
+```
+
+```{r, fig.width=5, fig.height=5, fig.cap="Comparison of raw counts with rlog transformed counts",dpi = 144, echo=FALSE}
+par( mfrow = c( 1, 2 ) )
+dds <- estimateSizeFactors(dds)
+plot( log2( 1 + counts(dds, normalized=TRUE)[ , 1:2] ),
+     col=rgb(0,0,0,.2), pch=16, cex=0.3 )
+plot( assay(rld)[ , 1:2],
+     col=rgb(0,0,0,.2), pch=16, cex=0.3 )
+par( mfrow = c(1,1) )
+```
+
+###Sample to Sample distances by euclidean distance between samples using the rlog transformed data
+```{r, fig.width=5, fig.height=5, fig.cap="Hierarchical clustering of the data set",dpi = 144, echo=FALSE}
+sampleDists <- dist( t( assay(rld) ) )
+sampleDistMatrix <- as.matrix( sampleDists )
+rownames(sampleDistMatrix) <- dds$sampleName
+colors <- colorRampPalette( rev(brewer.pal(9, "Blues")) )(255)
+hc <- hclust(sampleDists)
+heatmap.2( sampleDistMatrix, Rowv=as.dendrogram(hc),
+          symm=TRUE, trace="none", col=colors,
+          margins=c(2,10), labCol=FALSE )
+```
+
+This plot shows the similarity of the samples based on their expression values (rlog transformed)
+
+###Sample to Sample distances with principal component analysis
+```{r, fig.width=5, fig.height=5, fig.cap="Hierarchical clustering of the data set",dpi = 144, echo=FALSE}
+plotPCA(rld, intgroup = groupsForPCAplot)
+#second possibility to plot...
+# mds <- data.frame(cmdscale(sampleDistMatrix))
+# mds <- cbind(mds, colData(rld))
+# qplot(X1,X2,color=condition,data=mds)
+```
+
+The data points (i.e., here, the samples) are projected onto the 2D plane such that they spread out in the two directions which explain most of the differences in the data. The x-axis is the direction (or principal component) which separates the data points the most. The amount of the total variance which is contained in the direction is printed in the axis label.
+
+##Differential Expression Analysis
+
+###Calculation by DESeq
+```{r, diffExpAnalysis, echo=FALSE}
+dds$condition <- relevel(dds$condition, firstConditionLvl)
+dds <- DESeq(dds)
+res <- results(dds)
+resOrdered <- res[order(res$padj),]
+#DIFFERENT CONTRASTS MAY BE DEFINED AND ADDED TO THIS TEMPLATE HERE: 
+#results(dds, contrast=c("cell", "N061011", "N61311"))
+```
+
+###Explanation of the columns in the result table
+```{r, diffExpAnalysis_1, echo=FALSE}
+mcols(res, use.names=TRUE)
+```
+Of course, this estimate has an uncertainty associated with it, which is available in the column lfcSE, the standard error estimate for the log2 fold change estimate.
+
+###Summary statistics of the result
+```{r, diffExpAnalysis_2, echo=FALSE}
+summary(res)
+```
+###Number of differentially expressed genes
+
+```{r, diffExpAnalysis_3, echo=FALSE}
+sum(res$padj < 0.1, na.rm=TRUE)
+```
+
+###Top differentially expressed genes (sorted by p-value)
+```{r, diffExpAnalysis_4, echo=FALSE}
+resSig <- subset(res, padj < 0.1)
+if( dim(resSig)[1] == 0 ){
+  resSig = resOrdered[1:10,]
+} 
+head(resSig)
+topGene = which( rownames(res) %in%  rownames(head(resSig)) )
+```
+
+###Top down-regulated genes
+```{r, diffExpAnalysis_5, echo=FALSE}
+head(resSig[ order( resSig$log2FoldChange ), ])
+```
+
+###Top up-regulated genes
+```{r, diffExpAnalysis_6, echo=FALSE}
+head(resSig[ order( -resSig$log2FoldChange ), ])
+```
+
+###MA Plot highlighting the top 6 genes (sorted by adjusted p-value)
+```{r, fig.width=5, fig.height=5, fig.cap="MA Plot",dpi = 144, echo=FALSE}
+plotMA(res, ylim=c(-5,5))
+with(res[topGene, ], {
+  points(baseMean, log2FoldChange, col="dodgerblue", cex=2, lwd=2)
+  text(baseMean, log2FoldChange, rownames(res[topGene, ]), pos=2, col="dodgerblue", cex=0.8)
+})
+```
+
+###Creating a report of the top differentially expressed genes
+```{r, diffExpAnalysis_7, echo=FALSE}
+des2Report <- HTMLReport(shortName = "tmpReport",
+                           title = "Differentially Expressed genes",
+                           reportDirectory = "./reports")
+#Top 50 genes are reported
+publish(dds, des2Report, pvalueCutoff=0.9,n = numberOfGenesToReport,
+           factor = colData(dds)$condition,
+          reportDir="./reports") #Otherwise the annotation.db is not needed -> only rownames are displayed
+
+finish(des2Report)
+```
+The report that contains the read count distribution for each gene can be accessed here
+```{r  results='asis', echo=FALSE}
+cat(  paste0("<a href=\"reports/tmpReport.html\"> ", "Top ",numberOfGenesToReport," differentially expressed genes  </a>") )
+```
+
+##Diagnostic Plots
+
+Whether a gene is called significant depends not only on its LFC but also on its within-group variability, which DESeq2 quantifies as the dispersion. For strongly expressed genes, the dispersion can be understood as a squared coefficient of variation: a dispersion value of 0.01 means that the gene's expression tends to differ by typically sqrt(0.01) = 10% between samples of the same treatment group. For weak genes, the Poisson noise is an additional source of noise.
+
+###Dispersion estimation
+```{r, fig.width=5, fig.height=5, fig.cap="dispersion estimate",dpi = 144, echo=FALSE}
+plotDispEsts(dds)
+```
+
+The black points are the dispersion estimates for each gene as obtained by considering the information from each gene separately. Unless one has many samples, these values fluctuate strongly around their true values. Therefore, we fit the red trend line, which shows the dispersions' dependence on the mean, and then shrink each gene's estimate towards the red line to obtain the final estimates (blue points) that are then used in the hypothesis test. The blue circles above the main "cloud" of points are genes which have high gene-wise dispersion estimates which are labelled as dispersion outliers. These estimates are therefore not shrunk toward the fitted trend line.
+
+###Histogram of the p-values 
+```{r, fig.width=5, fig.height=5, fig.cap="dispersion estimate",dpi = 144, echo=FALSE}
+hist(res$pvalue[res$baseMean > 1], breaks=20, col="grey50", border="white")
+```
+
+Normally one should see a peak on the left side (genes with very small counts are excluded)
+
+
+#Gene Clustering
+
+##This heatmap shows the clustering of the 100 genes with the highest variance across samples
+```{r, geneClustering_1, echo=FALSE}
+topVarGenes <- head(order(-rowVars(assay(rld))),100)
+```
+
+```{r, fig.width=5, fig.height=5, fig.cap="dispersion estimate",dpi = 144, echo=FALSE}
+colors <- colorRampPalette( rev(brewer.pal(9, "PuOr")) )(255)
+sidecols <- c("grey","dodgerblue")[ rld$condition ]
+mat <- assay(rld)[ topVarGenes, ]
+mat <- mat - rowMeans(mat)
+colnames(mat) <- rld$sampleName
+heatmap.2(mat, trace="none", col=colors, ColSideColors=sidecols,
+          labRow=FALSE, mar=c(10,2), scale="row")
+```
+
+
+
+##Interactive Plots (Javascript needs to be enabled)
+
+### Interactive MA Plot of the top 500 genes
+````{r echo=FALSE, results='asis' }
+dataToPlot = as.data.frame(resOrdered[1:500,])
+dataToPlot$ID = rownames(dataToPlot)
+
+n2 = nPlot( log2FoldChange ~ baseMean, data=dataToPlot, type='scatterChart', group='chipType' )
+n2$chart(tooltipContent= "#! function(key, x, y, e){
+  return '<b>Name: </b> ' + e.point.ID + '<br/>' + 
+         '<b>PValue: </b> ' + e.point.pvalue + '<br/>' + 
+         '<b>adjPValue: </b>' + e.point.padj
+} !#")
+n2$print("chart1")
+
+```
+
+
+
+
