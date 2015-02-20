@@ -46,12 +46,17 @@ readCompositionIdentity = 0.95 #This is used for clustering: If 0.95: At least 9
 # so in this case if there are 5% reads that are different then the contig will be kept next to the representative contig. When this value is set to 1 then contigs will be clustered to the 
 # representative contig if they share the same reads. If this is set to 0, then a contig will be deleted if it shares 1 or more reads with an representative contig!
 
+#Differential Expression analysis parameters
+#Name and Path of the tab separated file containing the sample information
+samplesInfo = read.table(file=file.path(rootDir, "samplesInfo.csv"), sep="\t", header=TRUE) #should contain cloumn condition and column sample name
+if(!( "sampleName" %in% colnames(samplesInfo) & "condition"%in% colnames(samplesInfo))) {stop("Please provide a sampleInfo file with column condition and column sampleName")}
+
+#HERE THE LINEAR MODEL FOR DIFFERENTIAL EXPRESSION MAY BE DEFINED
+diffExpFormula = with(samplesInfo,~condition)
+                        
 
 ####################################
 #     The paths to the command line programs should be set HERE!
-#
-#   
-#
 ####################################
 #This code greps all export PATH statement from the bashrc file
 pathvars = readLines(file.path(path.expand("~"),".bashrc"))
@@ -133,9 +138,6 @@ dir.create(annotationDir)
 diffExpDir = file.path(rootDir,"diffExpAnalysis")
 dir.create(diffExpDir)
 
-#Name and Path of the tab separated file containing the sample information
-samplesInfo = read.table(file=file.path(rootDir, "samplesInfo.csv"), sep="\t", header=TRUE) #should contain cloumn condition and column sample name
-if(!( "sampleName" %in% colnames(samplesInfo) & "condition"%in% colnames(samplesInfo))) {stop("Please provide a sampleInfo file with column condition and column sampleName")}
 
 #Saving the configuration file: DO NOT CHANGE ITS NAME!
 save.image(file.path(rootDir,"Configuration.rda") )
