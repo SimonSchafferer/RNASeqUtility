@@ -19,19 +19,25 @@ library("edgeR")
 library(RNASeqUtility)
 require(rtracklayer)
 
-rownames(count_contigsDF ) = count_contigsDF$contigID
-rownames(ensReadsCountDF_clustered ) = ensReadsCountDF_clustered$UID
-counts = ensReadsCountDF_clustered[,3:(2+length(samplesInfo$condition))]
-counts = rbind(counts, count_contigsDF[,7:dim(count_contigsDF)[2]])
-counts_tmp = as.data.frame(apply(counts, 2, as.numeric))
-rownames(counts_tmp) = rownames(counts)
-
 if( dim(otherReadsCountDF)[1] > 0 ){
+  rownames(count_contigsDF ) = count_contigsDF$contigID
+  rownames(ensReadsCountDF_clustered ) = ensReadsCountDF_clustered$UID
+  counts = ensReadsCountDF_clustered[!ensReadsCountDF_clustered$gene_biotype %in% c("miRNA","snoRNA")  ,3:(2+length(samplesInfo$condition))]
+  counts = rbind(counts, count_contigsDF[,7:dim(count_contigsDF)[2]])
+  counts_tmp = as.data.frame(apply(counts, 2, as.numeric))
+  rownames(counts_tmp) = rownames(counts)
   otherReadsCountDF_tmp = otherReadsCountDF[, which( !colnames(otherReadsCountDF) %in% c("mapStart","mapEnd")  ) ]
   otherReadsCountDF_tmp = otherReadsCountDF_tmp[,-1]
   otherReadsCountDF_tmp = as.data.frame(apply(otherReadsCountDF_tmp, 2, as.numeric))
   rownames(otherReadsCountDF_tmp) = otherReadsCountDF[,1]
   counts_tmp = rbind( counts_tmp, otherReadsCountDF_tmp  )
+} else{
+  rownames(count_contigsDF ) = count_contigsDF$contigID
+  rownames(ensReadsCountDF_clustered ) = ensReadsCountDF_clustered$UID
+  counts = ensReadsCountDF_clustered[,3:(2+length(samplesInfo$condition))]
+  counts = rbind(counts, count_contigsDF[,7:dim(count_contigsDF)[2]])
+  counts_tmp = as.data.frame(apply(counts, 2, as.numeric))
+  rownames(counts_tmp) = rownames(counts)
 }
 
 counts = counts_tmp
