@@ -398,6 +398,17 @@ system(paste0("bash ", commandLog, " > ", executionLog ))
 cmdExecTime = proc.time() - cmdExecTime
 cmdExecTime
 
+ncRNAreadCountDF = tryCatch({
+  ncRNAreadCountDF = generateCountFromMappingDF(bamToBedAndMergencRNAL)  
+  write.table( ncRNAreadCountDF, file.path(readCountsDir, "ncRNAreadCountDF.csv"), sep="\t", col.names=TRUE, row.names=TRUE )
+  return(ncRNAreadCountDF)
+}, warning = function(w) {
+  message("Could not create count table - skipping")
+}, error = function(e) {
+  message("Could not create count table - skipping")
+}, finally = {
+  message("Could not create count table - skipping")
+})
 
 ########################################################################################################################################################
 #                                                                       Contig clustering
@@ -485,7 +496,7 @@ inFN = file.path( sapply( mappingCLI_cmdResL,function(x){getOutFilePath(getCLIAp
 multiBamCov_CLI = MultiBamCov_CLI(inFilePath = "", 
                                   inFileNames = inFN,
                                   cliParams =  c("-s -f 0.05 -D"), # -q 20 quality values not supported rna-star output! -D include duplicated reads 0.05 ~1bp at length 200 - 10 bp -> only good for short read data! 
-                                  outputFlag = "_multibamcov", 
+                                  outputFlag = "contigsCountDF.csv", 
                                   outFilePath = readCountsDir,
                                   annotationFileMB = file.path(contigClusterDir,clusteredContigsFN), 
                                   annotationType = "bed")

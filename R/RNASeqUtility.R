@@ -1,3 +1,74 @@
+#' @title Generate Count table
+#'
+#' @description This method combines the read counts after counting them  with mergeBed from bam files
+#' @param bamToBedAndMergencRNAL bed files after mapping
+#' @return read count table
+#' @docType methods
+#' @export
+generateCountFromMappingDF = function( bamToBedAndMergencRNAL ){
+  require(rtracklayer)
+  
+  ncRNAReadCountL = lapply( bamToBedAndMergencRNAL, function(x){
+    x = x[[2]]
+    
+    dir = getOutFilePath(getCLIApplication(x))
+    dir = sub("/home/simon/PHDStudies/RNA-Seq/IonProton/Alzheimer_postmortemBrain/","/media/schaffrr/KINGSTON/RNA-Seq/SampleAnalysis/" ,dir)
+    
+    return( import( file.path( dir,getOutResultName(getOutResultReference(x))), format="BED",asRangedData=FALSE ) )
+  })
+  
+  #Create a reference dataframe containing all entries (Ensembl ids plus strand as ID)
+  overallTable = unique(do.call( rbind, lapply( ncRNAReadCountL, function(x){
+    xdf = as.data.frame(x)
+    colnames(xdf) = c("transcript_id", "mapStart","mapEnd","mapWidth","mapStrand","readCount","mapQ")
+    xdf$UID = paste0(xdf$transcript_id, ifelse(xdf$mapStrand == "-", "_minus", "_plus") )
+    return(xdf[,c("transcript_id","UID")])
+  }) ) )
+  rownames(overallTable) = 1:dim(overallTable)[1]
+  
+  
+  #Now merge with counted reads
+  readsCountDF = do.call( cbind, lapply( ncRNAReadCountL, function(x){
+    xdf = as.data.frame(x)
+    colnames(xdf) = c("transcript_id", "mapStart","mapEnd","mapWidth","mapStrand","readCount","mapQ")
+    xdf$UID = paste0(xdf$transcript_id, ifelse(xdf$mapStrand == "-", "_minus", "_plus") )
+    #Merge The duplicated UIDs
+    xdf = do.call(rbind, lapply( split(xdf, xdf$UID), function(x){
+      xnew = x[1,]
+      xsize = dim(x)[1]
+      if( xsize != 1 ){
+        xnew$mapStart = min(as.numeric(x$mapStart))
+        xnew$mapEnd = min(as.numeric(x$mapEnd))
+        xnew$readCount = sum(as.numeric(x$readCount),na.rm = TRUE)
+        xnew$mapQ = mean(as.numeric(x$mapQ),na.rm = TRUE)
+      }
+      return(xnew)
+    }))
+    xdf_merged = merge(overallTable, xdf[,c("UID", "readCount","mapStart","mapEnd")], by="UID", all.x=TRUE)
+    return(xdf_merged)
+  } ) )
+  
+  #Change for mapStart take minimum and map End take maximum? -> else rowMeans should be ok too, but round!
+  mapStart = readsCountDF[,grep("mapStart", colnames(readsCountDF)) ]
+  mapStart = apply(mapStart, 1, min, na.rm=TRUE)
+  mapEnd = readsCountDF[,grep("mapEnd", colnames(readsCountDF)) ]
+  mapEnd = apply(mapEnd, 1, min, na.rm=TRUE)
+  
+  
+  readsCountDF = readsCountDF[, c(1, grep("readCount", colnames(readsCountDF))) ]
+  colnames(readsCountDF)[1] = "UID"
+  colnames(readsCountDF)[2:length(colnames(readsCountDF))] = samplesInfo$sampleName
+  #Changing all NA values to zero
+  readsCountDF[,2:length(colnames(readsCountDF))] = apply(readsCountDF[,2:length(colnames(readsCountDF))], 2, function(x){
+    ifelse( is.na(x), 0, x)
+  })
+  readsCountDF$mapStart = mapStart
+  readsCountDF$mapEnd = mapEnd
+  
+  return( readsCountDF )
+  
+}
+
 #' @title Summarize contig Annotation
 #'
 #' @description This method summarizes the contig annotation table by first checking for range based annotation then for rfam annotation then for repeat annotation 
