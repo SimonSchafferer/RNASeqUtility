@@ -5,6 +5,9 @@ Version: 1.0
 Date: 2015-01-19
 Author: Simon Schafferer
 Maintainer: Who to complain to <yourfault@somewhere.net>
-Description: This package contains helper Methods for RNA-Seq analysis and provides templates in RNASeqAnalysisTemplates folder
+Description: This package contains helper Methods for RNA-Seq analysis and
+    provides templates in RNASeqAnalysisTemplates folder
 License: MIT
-Depends: CLIHelperPackage, sncRNAannotation
+Depends:
+    CLIHelperPackage,
+    sncRNAannotation
