@@ -60,7 +60,7 @@ diffExpFormula = with(samplesInfo,~condition)
 ####################################
 #This code greps all export PATH statement from the bashrc file
 pathvars = readLines(file.path(path.expand("~"),".bashrc"))
-pathvars = pathvars[grep("export PATH\\=\\$PATH:",  pathvars )]
+pathvars = pathvars[grep("^export PATH\\=\\$PATH:",  pathvars )]
 pathvars = sub( "export PATH\\=\\$PATH:", "",pathvars)
 Sys.setenv(PATH=paste(Sys.getenv("PATH"),paste(pathvars,collapse=":"),sep=":")) 
 

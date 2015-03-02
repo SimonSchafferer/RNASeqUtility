@@ -325,7 +325,7 @@ intersectBed_CLI_cmdResL = lapply( bamToBedAndMergeL, function(x){
 tmpCommandLog = c(tmpCommandLog, sapply(intersectBed_CLI_cmdResL, getCommandLog) )
 
 #############################################
-#   Clusering Preparation
+#   Clustering Preparation
 #     Contig Assembly - between samples - MultiIntersectBed
 #
 #     Merging these to count the reads and also calculate the genomic uniqueness in each contig
@@ -341,6 +341,15 @@ mergeBedFile_CLI_cmdResL = lapply(intersectBed_CLI_cmdResL, function(x){
   return(mergeBedFile_CLI_cmdRes)
 })
 
+#Adjusting to the newest BedTools Version, since it is not allowed to have characters in the 7th column in the new version, an awk script changes this!
+#It is inserted after sorting!
+mergeBedFile_CLI_cmdResL = lapply(mergeBedFile_CLI_cmdResL, function(x){
+  cmd = getCommands(x)[2] 
+  cmdSplit = strsplit(cmd, split = "mergeBed")
+  cmd = c("\n",cmdSplit[[1]][1], "awk -v OFS=\'\\t\' \'{gsub(\".*\",\"0\",$7)}1\' | mergeBed",cmdSplit[[1]][2])
+  x@commands[2] = paste0(cmd,collapse="")
+  return(x)
+})
 tmpCommandLog = c(tmpCommandLog, sapply(mergeBedFile_CLI_cmdResL, getCommandLog) )
 
 
