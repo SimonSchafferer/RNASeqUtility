@@ -64,6 +64,7 @@ pathvars = pathvars[grep("^export PATH\\=\\$PATH:",  pathvars )]
 pathvars = sub( "export PATH\\=\\$PATH:", "",pathvars)
 Sys.setenv(PATH=paste(Sys.getenv("PATH"),paste(pathvars,collapse=":"),sep=":")) 
 
+perlPath = "" #/usr/bin for example or nothing would be system default
 
 ######################################
 #       Options that may be changed 

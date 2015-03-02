@@ -292,9 +292,9 @@ if(grouping){
   groupVect = 1:length(samplesInfo$condition)
   names(groupVect) = unique(samplesInfo$condition)
   groupVect = groupVect[samplesInfo$condition]
-  multiIntersectBed_perl_CLI = MultiIntersectBed_perl_CLI(inFilePath = inFP, inFileNames = inFN, outputFlag = "",withinGroupTH = withinGroupTH, groupVect = groupVect, outFileName = "multiIntersectClust",outFilePath = contigAssemblyDir)
+  multiIntersectBed_perl_CLI = MultiIntersectBed_perl_CLI(inFilePath = inFP, inFileNames = inFN, outputFlag = "",withinGroupTH = withinGroupTH, groupVect = groupVect, outFileName = "multiIntersectClust",outFilePath = contigAssemblyDir, perlPath = perlPath)
 } else{
-  multiIntersectBed_perl_CLI = MultiIntersectBed_perl_CLI(inFilePath = inFP, inFileNames = inFN, outputFlag = "",withinGroupTH = withinGroupTH, outFileName = "multiIntersectClust",outFilePath = contigAssemblyDir)
+  multiIntersectBed_perl_CLI = MultiIntersectBed_perl_CLI(inFilePath = inFP, inFileNames = inFN, outputFlag = "",withinGroupTH = withinGroupTH, outFileName = "multiIntersectClust",outFilePath = contigAssemblyDir, perlPath = perlPath)
 }
 
 tmpCommandLog = c(tmpCommandLog, paste0("\nmkdir ",contigAssemblyDir,"\n") )
@@ -407,6 +407,17 @@ system(paste0("bash ", commandLog, " > ", executionLog ))
 cmdExecTime = proc.time() - cmdExecTime
 cmdExecTime
 
+ncRNAreadCountDF = tryCatch({
+  ncRNAreadCountDF = generateCountFromMappingDF(bamToBedAndMergencRNAL)  
+  write.table( ncRNAreadCountDF, file.path(readCountsDir, "ncRNAreadCountDF.csv"), sep="\t", col.names=TRUE, row.names=TRUE )
+  return(ncRNAreadCountDF)
+}, warning = function(w) {
+  message("Could not create count table - skipping")
+}, error = function(e) {
+  message("Could not create count table - skipping")
+}, finally = {
+  message("Could not create count table - skipping")
+})
 
 ########################################################################################################################################################
 #                                                                       Contig clustering
@@ -494,7 +505,7 @@ inFN = file.path( sapply( mappingCLI_cmdResL,function(x){getOutFilePath(getCLIAp
 multiBamCov_CLI = MultiBamCov_CLI(inFilePath = "", 
                                   inFileNames = inFN,
                                   cliParams =  c("-s -f 0.05 -D"), # -q 20 quality values not supported rna-star output! -D include duplicated reads 0.05 ~1bp at length 200 - 10 bp -> only good for short read data! 
-                                  outputFlag = "_multibamcov", 
+                                  outputFlag = "contigsCountDF.csv", 
                                   outFilePath = readCountsDir,
                                   annotationFileMB = file.path(contigClusterDir,clusteredContigsFN), 
                                   annotationType = "bed")
