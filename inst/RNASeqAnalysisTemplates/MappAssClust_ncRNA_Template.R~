@@ -513,15 +513,6 @@ multiBamCov_CLI = MultiBamCov_CLI(inFilePath = "",
 multiBamCov_CLI_cmdRes = generateCommandResult( object = multiBamCov_CLI )
 commandLogCounting = c(commandLogCounting, getCommandLog(multiBamCov_CLI_cmdRes) )
 
-
-rownames(count_contigsDF ) = count_contigsDF$contigID
-rownames(ensReadsCountDF_clustered ) = ensReadsCountDF_clustered$UID
-counts = ensReadsCountDF_clustered[,3:(2+length(samplesInfo$condition))]
-counts = rbind(counts, count_contigsDF[,7:dim(count_contigsDF)[2]])
-counts_tmp = as.data.frame(apply(counts, 2, as.numeric))
-rownames(counts_tmp) = rownames(counts)
-
-
 setwd(rootDir)
 sapply( commandLogCounting, system)
 

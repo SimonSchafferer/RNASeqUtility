@@ -9,7 +9,7 @@
 ######################################################
 
 #Base directory of the analysis
-rootDir = file.path( "/home","simon","PHDStudies","RNA-Seq","IonProton","Alzheimer_postmortemBrain","SampleAnalysisTesting")#schaffrr
+rootDir = file.path( "/tmp","test","","","","","")#schaffrr
 #Directory containging fastq files
 rawDataDir = file.path(rootDir,"rawData")
 
@@ -46,16 +46,25 @@ readCompositionIdentity = 0.95 #This is used for clustering: If 0.95: At least 9
 # so in this case if there are 5% reads that are different then the contig will be kept next to the representative contig. When this value is set to 1 then contigs will be clustered to the 
 # representative contig if they share the same reads. If this is set to 0, then a contig will be deleted if it shares 1 or more reads with an representative contig!
 
+#Differential Expression analysis parameters
+#Name and Path of the tab separated file containing the sample information
+samplesInfo = read.table(file=file.path(rootDir, "samplesInfo.csv"), sep="\t", header=TRUE) #should contain cloumn condition and column sample name
+if(!( "sampleName" %in% colnames(samplesInfo) & "condition"%in% colnames(samplesInfo))) {stop("Please provide a sampleInfo file with column condition and column sampleName")}
+
+#HERE THE LINEAR MODEL FOR DIFFERENTIAL EXPRESSION MAY BE DEFINED
+diffExpFormula = with(samplesInfo,~condition)
+                        
 
 ####################################
 #     The paths to the command line programs should be set HERE!
 ####################################
 #This code greps all export PATH statement from the bashrc file
 pathvars = readLines(file.path(path.expand("~"),".bashrc"))
-pathvars = pathvars[grep("export PATH\\=\\$PATH:",  pathvars )]
+pathvars = pathvars[grep("^export PATH\\=\\$PATH:",  pathvars )]
 pathvars = sub( "export PATH\\=\\$PATH:", "",pathvars)
 Sys.setenv(PATH=paste(Sys.getenv("PATH"),paste(pathvars,collapse=":"),sep=":")) 
 
+perlPath = "" #/usr/bin for example or nothing would be system default
 
 ######################################
 #       Options that may be changed 
@@ -130,9 +139,6 @@ dir.create(annotationDir)
 diffExpDir = file.path(rootDir,"diffExpAnalysis")
 dir.create(diffExpDir)
 
-#Name and Path of the tab separated file containing the sample information
-samplesInfo = read.table(file=file.path(rootDir, "samplesInfo.csv"), sep="\t", header=TRUE) #should contain cloumn condition and column sample name
-if(!( "sampleName" %in% colnames(samplesInfo) & "condition"%in% colnames(samplesInfo))) {stop("Please provide a sampleInfo file with column condition and column sampleName")}
 
 #Saving the configuration file: DO NOT CHANGE ITS NAME!
 save.image(file.path(rootDir,"Configuration.rda") )
@@ -212,3 +218,15 @@ save.image(file.path(rootDir,"Configuration.rda") )
 # call sncRNAannotation::createRObject_gtf function, or execute the steps in this function
 #############################################
 
+#############################################
+#         Prepare infernal covariance model
+#
+#cmbuild -> use RFam pre-build db
+#cmcalibrate [options] cmfile -> use RFam pre-build db
+#
+#  Start here when using the RFam pre-build db
+#Compress the CM database first to accelerate cmscan!
+# cmpress Rfam.cm.1_1
+# this will generate various files (Rfam.cm.1_1.i1f,...), that have to be put in a directory and the path and infernal base name (in this case Rfam.cm.1_1) to these files has to be provided
+# for the variable infernalDB
+#############################################
