@@ -416,7 +416,7 @@ ncRNAreadCountDF = tryCatch({
 }, error = function(e) {
   message("Could not create count table - skipping")
 }, finally = {
-  message("Could not create count table - skipping")
+  #message("Could not create count table - skipping")
 })
 
 ########################################################################################################################################################
