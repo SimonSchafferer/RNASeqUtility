@@ -12,7 +12,6 @@ generateCountFromMappingDF = function( bamToBedAndMergencRNAL ){
     x = x[[2]]
     
     dir = getOutFilePath(getCLIApplication(x))
-    dir = sub("/home/simon/PHDStudies/RNA-Seq/IonProton/Alzheimer_postmortemBrain/","/media/schaffrr/KINGSTON/RNA-Seq/SampleAnalysis/" ,dir)
     
     return( import( file.path( dir,getOutResultName(getOutResultReference(x))), format="BED",asRangedData=FALSE ) )
   })
