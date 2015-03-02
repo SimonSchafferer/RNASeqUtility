@@ -186,7 +186,7 @@ des2Report <- HTMLReport(shortName = "tmpReport",
                            title = "Differentially Expressed genes",
                            reportDirectory = "./reports")
 #Top 50 genes are reported
-publish(dds, des2Report, pvalueCutoff=1,n = numberOfGenesToReport,
+publish(dds, des2Report, pvalueCutoff=0.9,n = numberOfGenesToReport,
            factor = colData(dds)$condition,
           reportDir="./reports") #Otherwise the annotation.db is not needed -> only rownames are displayed
 
