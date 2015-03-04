@@ -77,7 +77,7 @@ generateCountFromMappingDF = function( bamToBedAndMergencRNAL ){
 #' @export
 summarizeContigAnnotation = function(contigDF){
   currentlySupportedCols = c("contigID","g_gene_biotype","g_gene_type_ext","g_gene_name","r_repClass","r_repName","inf_targetName","inf_descriptionOfTarget")
-  if( !(colnames( contigDF ) %in% currentlySupportedCols) ){
+  if( sum(colnames( contigDF ) %in% currentlySupportedCols) == length(colnames( contigDF )) ){
     stop( paste0("Please provide following columns in your input:\n ", paste0(currentlySupportedCols, collapse=" ") ) )    
   } 
   
@@ -89,10 +89,11 @@ summarizeContigAnnotation = function(contigDF){
   #start with range based annotation, then go to repeat masker if infernal is ? -> else infernal first then repeat masker
   featureAnnotType = c()
   featureAnnotName = c()
+  annotationType = c()
   
   featureAnnotType = with(contigDF,  ifelse( 
     #outer if statement 
-    contigDF$f_featureAnnot_short == "unknown", ifelse(contigDF$inf_inc == "!" ,
+    contigDF$f_featureAnnot_short == "unknown", ifelse(!is.na(contigDF$inf_inc) & contigDF$inf_inc == "!" ,
                                                        sub( ".*small nucleolar RNA.*","snoRNA", sub(".*microRNA.*","miRNA",contigDF$inf_descriptionOfTarget, ignore.case=TRUE), ignore.case=TRUE ), 
                                                        ifelse(!is.na(contigDF$r_repClass), 
                                                               contigDF$r_repClass, "unknown")),
@@ -102,12 +103,23 @@ summarizeContigAnnotation = function(contigDF){
   
   featureAnnotName = with(contigDF,  ifelse( 
     #outer if statement 
-    contigDF$f_featureAnnot_short == "unknown", ifelse(contigDF$inf_inc == "!" ,
+    contigDF$f_featureAnnot_short == "unknown", ifelse(!is.na(contigDF$inf_inc) & contigDF$inf_inc == "!" ,
                                                        contigDF$inf_targetName, 
                                                        ifelse(!is.na(contigDF$r_repClass), 
                                                               contigDF$r_repName, "unknown")),
     #outer else statement
     contigDF$f_feature_name
+  ) )
+
+  
+  annotationType = with(contigDF,  ifelse( 
+    #outer if statement 
+    contigDF$f_featureAnnot_short == "unknown", ifelse(!is.na(contigDF$inf_inc) & contigDF$inf_inc == "!" ,
+                                                       "infernal", 
+                                                       ifelse(!is.na(contigDF$r_repClass), 
+                                                              "repeatMaskr", "unknown")),
+    #outer else statement
+    "featureAnnot"
   ) )
   
   # Long form for readability but this would need to be iterated with for loop -> slow in R!:  
@@ -128,8 +140,9 @@ summarizeContigAnnotation = function(contigDF){
   #     featureAnnotType = c(featureAnnotType,contigDF$f_featureAnnot_short)
   #     featureAnnotName = c(featureAnnotName,contigDF$f_feature_name) 
   #   }    
-  gene_type$featureAnnotType = featureAnnotType
+  gene_type$featureAnnotType = featureAnnotType#ifelse( is.na(featureAnnotType), "none",annotationType)
   gene_type$featureAnnotName = featureAnnotName
+  gene_type$annotationType = annotationType#ifelse( is.na(annotationType), "none",annotationType)
   return(gene_type)
 }
 

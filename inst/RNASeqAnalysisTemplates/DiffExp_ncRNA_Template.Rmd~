@@ -29,7 +29,7 @@ library(rCharts)
 
 ```{r preparation, echo=FALSE}
 #TESTING 
-load("/home/simon/PHDStudies/RNA-Seq/IonProton/Alzheimer_postmortemBrain/Annotation.rda")
+load("Annotation.rda")
 setwd(rootDir)
 args <- commandArgs(TRUE)
 if( length(args) == 0 ){
@@ -40,7 +40,7 @@ if( length(args) == 0 ){
 # load(file.path( rootDir,"Annotation.rda"))#
 
 groupsForPCAplot = "condition"
-firstConditionLvl = "WT" #It will be convenient to make sure that untrt is the first level in the dex factor, so that the default log2 fold changes are calculated as treated over untreated
+firstConditionLvl = as.character(samplesInfo$condition[1]) #It will be convenient to make sure that untrt is the first level in the dex factor, so that the default log2 fold changes are calculated as treated over untreated
 numberOfGenesToReport=50
 ```
 
@@ -48,22 +48,35 @@ numberOfGenesToReport=50
 
 ##Count Table creation
 ```{r countTableCreation, echo=FALSE, eval=TRUE}
-#Preparation of the count table 
-rownames(count_contigsDF ) = count_contigsDF$contigID
-rownames(ensReadsCountDF_clustered ) = ensReadsCountDF_clustered$UID
-counts = ensReadsCountDF_clustered[,3:(2+length(samplesInfo$condition))]
-counts = rbind(counts, count_contigsDF[,7:dim(count_contigsDF)[2]])
-counts_tmp = as.data.frame(apply(counts, 2, as.numeric))
-rownames(counts_tmp) = rownames(counts)
+
+###########################################################
+#       Filtering by low expressed reads and subsetting by Annotation!
+###########################################################
+
+#Filter ENSEMBL ANNOTATION BY BIOTYPE
+ensReadsCountDF_clustered_filt = ensReadsCountDF_clustered[ which( !ensReadsCountDF_clustered$gene_biotype %in% c("miRNA","snoRNA") ), ]
+
+countsEns = apply(ensReadsCountDF_clustered_filt[,(which(colnames(ensReadsCountDF_clustered_filt) == "UID")+1) : (which(colnames(ensReadsCountDF_clustered_filt) == "mapStart")-1)],2,as.numeric)
+rownames(countsEns) = ensReadsCountDF_clustered_filt$UID
+keep = rowSums(countsEns == 0) <= (dim(countsEns)[2]/2)+1
+countsEns = countsEns[keep,]
+
+countsContigs = apply(contigAnnotTable_fin[,grep("^[0-9]+$",colnames(contigAnnotTable_fin))],2,as.numeric)
+rownames(countsContigs) = contigAnnotTable_fin$contigID
+keep = rowSums(countsContigs == 0) <= (dim(countsContigs)[2]/2)+1
+countsContigs = countsContigs[keep,]
 
 if( dim(otherReadsCountDF)[1] > 0 ){
-  otherReadsCountDF_tmp = otherReadsCountDF[, which( !colnames(otherReadsCountDF) %in% c("mapStart","mapEnd")  ) ]
-  otherReadsCountDF_tmp = otherReadsCountDF_tmp[,-1]
-  otherReadsCountDF_tmp = as.data.frame(apply(otherReadsCountDF_tmp, 2, as.numeric))
-  rownames(otherReadsCountDF_tmp) = otherReadsCountDF[,1]
-  counts_tmp = rbind( counts_tmp, otherReadsCountDF_tmp  )
+  countsOther = apply(otherReadsCountDF[,(which(colnames(otherReadsCountDF) == "UID")+1) : (which(colnames(otherReadsCountDF) == "mapStart")-1)],2,as.numeric)
+  rownames(countsOther) = otherReadsCountDF$UID
+  keep = rowSums(countsOther == 0) <= (dim(countsOther)[2]/2)+1
+  countsOther = countsOther[keep,]
+
+  counts = rbind( countsEns, countsContigs)
+  counts = rbind( counts, countsOther)
+} else{
+  counts = rbind( countsEns, countsContigs)
 }
-counts = counts_tmp
 
 head(counts)
 ```
@@ -163,12 +176,18 @@ topGene = which( rownames(res) %in%  rownames(head(resSig)) )
 
 ###Top down-regulated genes
 ```{r, diffExpAnalysis_5, echo=FALSE}
-head(resSig[ order( resSig$log2FoldChange ), ])
+tmp = resSig[ order( resSig$log2FoldChange ), ]
+tmp$UID = rownames(tmp)
+tmp = merge(as.data.frame(tmp), minimalAnnotationDF, by="UID", sort=FALSE)
+head(tmp)
 ```
 
 ###Top up-regulated genes
 ```{r, diffExpAnalysis_6, echo=FALSE}
-head(resSig[ order( -resSig$log2FoldChange ), ])
+tmp = resSig[ order( -resSig$log2FoldChange ), ]
+tmp$UID = rownames(tmp)
+tmp = merge(as.data.frame(tmp), minimalAnnotationDF, by="UID", sort=FALSE)
+head(tmp)
 ```
 
 ###MA Plot highlighting the top 6 genes (sorted by adjusted p-value)
@@ -186,7 +205,7 @@ des2Report <- HTMLReport(shortName = "tmpReport",
                            title = "Differentially Expressed genes",
                            reportDirectory = "./reports")
 #Top 50 genes are reported
-publish(dds, des2Report, pvalueCutoff=0.9,n = numberOfGenesToReport,
+publish(dds, des2Report, pvalueCutoff=1,n = numberOfGenesToReport,
            factor = colData(dds)$condition,
           reportDir="./reports") #Otherwise the annotation.db is not needed -> only rownames are displayed
 
@@ -234,24 +253,87 @@ heatmap.2(mat, trace="none", col=colors, ColSideColors=sidecols,
 ```
 
 
+#Various Plots
+##MA Plot showing the biotype distribution
+
+````{r echo=FALSE }
+#Saving results
+dat = resOrdered
+dat$UID = rownames(dat)
+dat = merge(as.data.frame(dat), minimalAnnotationDF, by="UID", sort=FALSE)
+write.table(dat, "DETable.csv", sep="\t", col.names=TRUE, row.names=FALSE)
+```
+
+```{r, fig.width=5, fig.height=5, fig.cap="MA Plot Biotype",dpi = 144, echo=FALSE}
+dat$biotypeSummary = ifelse( !dat$biotype %in% c("antisense", "lincRNA", "miRNA", "snoRNA", "snRNA", "tRNA", "unknown", "rRNA"), "other", dat$biotype)
+# dat$biotypeSummary = ifelse( !dat$biotype %in% c("antisense", "lincRNA", "tRNA", "rRNA"), "other", dat$biotype)
+g1 = ggplot( dat, aes(x=log2(baseMean), y=log2FoldChange, color=biotypeSummary), environment=environment() ) + geom_point() + 
+  labs(title="MAPlot (Averaged over all arrays)", x="Intensity (A)", y="log2 Fold Change (M)")
+g1
+```
+
+```{r, fig.width=5, fig.height=5, fig.cap="MA Plot Biotype",dpi = 144, echo=FALSE}
+dat$biotypeSummary = ifelse( !dat$biotype %in% c("antisense", "lincRNA", "miRNA", "snoRNA", "snRNA", "tRNA", "unknown", "rRNA"), "other", dat$biotype)
+# dat$biotypeSummary = ifelse( !dat$biotype %in% c("antisense", "lincRNA", "tRNA", "rRNA"), "other", dat$biotype)
+g1 = ggplot( dat, aes(x=log2(baseMean), y=log2FoldChange, color=biotypeSummary), environment=environment() ) + geom_point() + 
+  labs(title="MAPlot (Averaged over all arrays)", x="Intensity (A)", y="log2 Fold Change (M)")
+g1
+```
+
+### Vulcano Plot of the resulting Data
+```{r, fig.width=5, fig.height=5, fig.cap="Vulcano Plot",dpi = 144, echo=FALSE}
+dat$logPrev = -log10(dat$pvalue)
+g = ggplot( dat, aes(x=log2FoldChange, y=logPrev, colour = biotypeSummary), environment=environment() ) + geom_point() +
+  labs(title="Vulcano Plot (Averaged over all arrays)", x="log2 Fold Change (M)", y="-log10(p-value)") + 
+  geom_hline(aes(yintercept=-log10(0.05)), color="red") + 
+  geom_text( data = dat[1:20,],aes(label=Name), show_guide = FALSE, size=2.5, color="black")
+g
+# scale_color_manual(values=c( "red","lightgrey")) + 
+#  geom_text( data = labelDF.tt, aes( x= logFC, y=logPrev, label=Name), show_guide = FALSE, size=2, color="black") #-0.07   geom_text( data = labelDF.tt, aes( x= logFC, y=logPrev, label=Name), show_guide = FALSE, size=2, color="black") #-0.07
+
+```
+
+### Histogram of the ncRNA classes
+```{r, fig.width=5, fig.height=5, fig.cap="BioType distribution",dpi = 144, echo=FALSE}
+ggplot(dat, aes(x=biotype) ) + geom_histogram(stat="bin") + coord_flip()
+```
+
+```{r, fig.width=5, fig.height=5, fig.cap="BioType intensity",dpi = 144, echo=FALSE}
+dat.hist = data.frame("Biotype"=names(table(dat$biotype)), "value"=as.numeric(table(dat$biotype)))
+
+dat.box1 = dat[,c("biotypeSummary","baseMean")]
+dat.box1$baseMean = log2(dat.box1$baseMean)
+dat.box1$group = "ReadCount"
+colnames(dat.box1) = c("biotype","value","group")
+dat.box2 = dat[,c("biotypeSummary","log2FoldChange")]
+dat.box2$group = "Log2FoldChange"
+colnames(dat.box2) = c("biotype","value","group")
+dat.box = rbind(dat.box1, dat.box2)
+
+g = ggplot( dat.box, aes(factor(biotype), y=value, fill=factor(biotype)), environment=environment() ) + geom_boxplot() + facet_grid(group~., scales="free")
+g
+# scale_color_manual(values=c( "red","lightgrey")) + 
+#  geom_text( data = labelDF.tt, aes( x= logFC, y=logPrev, label=Name), show_guide = FALSE, size=2, color="black") #-0.07   geom_text( data = labelDF.tt, aes( x= logFC, y=logPrev, label=Name), show_guide = FALSE, size=2, color="black") #-0.07
+```
+
+
+````{r echo=FALSE }
+save.image("workspace.rda")
+```
 
 ##Interactive Plots (Javascript needs to be enabled)
 
 ### Interactive MA Plot of the top 500 genes
+
 ````{r echo=FALSE, results='asis' }
-dataToPlot = as.data.frame(resOrdered[1:500,])
-dataToPlot$ID = rownames(dataToPlot)
-
-n2 = nPlot( log2FoldChange ~ baseMean, data=dataToPlot, type='scatterChart', group='chipType' )
-n2$chart(tooltipContent= "#! function(key, x, y, e){
-  return '<b>Name: </b> ' + e.point.ID + '<br/>' + 
-         '<b>PValue: </b> ' + e.point.pvalue + '<br/>' + 
-         '<b>adjPValue: </b>' + e.point.padj
-} !#")
-n2$print("chart1")
-
+# dataToPlot = as.data.frame(resOrdered[1:500,])
+# dataToPlot$ID = rownames(dataToPlot)
+# 
+# n2 = nPlot( log2FoldChange ~ baseMean, data=dataToPlot, type='scatterChart', group='chipType' )
+# n2$chart(tooltipContent= "#! function(key, x, y, e){
+#   return '<b>Name: </b> ' + e.point.ID + '<br/>' + 
+#          '<b>PValue: </b> ' + e.point.pvalue + '<br/>' + 
+#          '<b>adjPValue: </b>' + e.point.padj
+# } !#")
+# n2$print("chart1")
 ```
-
-
-
-

@@ -336,6 +336,7 @@ colnames(bestMatch) = paste0("inf_",colnames(bestMatch))
 #Merge the infernal annotations with the range based annotations
 contigAnnotTable_fin = merge( contigAnnotTable, bestMatch, by.x="contigID", by.y="inf_queryName", all.x=TRUE)
 
+
 #Adding the reads to the annotation table
 contigsCountDF = read.table( file.path( getOutFilePath(getCLIApplication(multiBamCov_CLI_cmdRes)),getOutResultName(getOutResultReference(multiBamCov_CLI_cmdRes)) ), 
                              sep="\t", header=FALSE)
@@ -410,3 +411,5 @@ if( length(otherncRNAReadCountL[[1]]) != 0 ){
 write.table(minimalAnnotationDF, file.path(annotationDir,"minimalAnnotationOfAllGenes.csv"),sep="\t",row.names=FALSE, col.names=TRUE )
 
 save.image(file.path(rootDir, "Annotation.rda"))
+
+
