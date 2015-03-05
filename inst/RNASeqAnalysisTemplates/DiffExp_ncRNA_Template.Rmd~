@@ -81,19 +81,19 @@ if( dim(otherReadsCountDF)[1] > 0 ){
 head(counts)
 ```
 
-##DESeq2 - Creating the DESeqDataSet
+## DESeq2 - Creating the DESeqDataSet
 ```{r DESeqDataSet, echo=TRUE, eval=TRUE}
 dds <- DESeqDataSetFromMatrix(countData = counts,
                                  colData = samplesInfo,
                                  design = ~ condition)
 ```
 
-##Sample Info Table
+## Sample Info Table
 ```{r samplesInfo, echo=TRUE, eval=TRUE}
 colData(dds)
 ```
 
-##Transformation and inspection of count data
+## Transformation and inspection of count data
 
 The transformation is done by regularized-logarithm transformation (rlog) in order to derive approximate homoskedastic data
 ```{r, echo=FALSE}
@@ -111,8 +111,8 @@ plot( assay(rld)[ , 1:2],
 par( mfrow = c(1,1) )
 ```
 
-###Sample to Sample distances by euclidean distance between samples using the rlog transformed data
-```{r, fig.width=5, fig.height=5, fig.cap="Hierarchical clustering of the data set",dpi = 144, echo=FALSE}
+### Sample to Sample distances by euclidean distance between samples using the rlog transformed data
+```{r, fig.width=6, fig.height=6, fig.cap="Hierarchical clustering of the data set",dpi = 200, echo=FALSE}
 sampleDists <- dist( t( assay(rld) ) )
 sampleDistMatrix <- as.matrix( sampleDists )
 rownames(sampleDistMatrix) <- dds$sampleName
@@ -125,7 +125,7 @@ heatmap.2( sampleDistMatrix, Rowv=as.dendrogram(hc),
 
 This plot shows the similarity of the samples based on their expression values (rlog transformed)
 
-###Sample to Sample distances with principal component analysis
+### Sample to Sample distances with principal component analysis
 ```{r, fig.width=5, fig.height=5, fig.cap="Hierarchical clustering of the data set",dpi = 144, echo=FALSE}
 plotPCA(rld, intgroup = groupsForPCAplot)
 #second possibility to plot...
@@ -136,9 +136,9 @@ plotPCA(rld, intgroup = groupsForPCAplot)
 
 The data points (i.e., here, the samples) are projected onto the 2D plane such that they spread out in the two directions which explain most of the differences in the data. The x-axis is the direction (or principal component) which separates the data points the most. The amount of the total variance which is contained in the direction is printed in the axis label.
 
-##Differential Expression Analysis
+## Differential Expression Analysis
 
-###Calculation by DESeq
+### Calculation by DESeq
 ```{r, diffExpAnalysis, echo=FALSE}
 dds$condition <- relevel(dds$condition, firstConditionLvl)
 dds <- DESeq(dds)
@@ -148,23 +148,23 @@ resOrdered <- res[order(res$padj),]
 #results(dds, contrast=c("cell", "N061011", "N61311"))
 ```
 
-###Explanation of the columns in the result table
+### Explanation of the columns in the result table
 ```{r, diffExpAnalysis_1, echo=FALSE}
 mcols(res, use.names=TRUE)
 ```
 Of course, this estimate has an uncertainty associated with it, which is available in the column lfcSE, the standard error estimate for the log2 fold change estimate.
 
-###Summary statistics of the result
+### Summary statistics of the result
 ```{r, diffExpAnalysis_2, echo=FALSE}
 summary(res)
 ```
-###Number of differentially expressed genes
 
+### Number of differentially expressed genes
 ```{r, diffExpAnalysis_3, echo=FALSE}
 sum(res$padj < 0.1, na.rm=TRUE)
 ```
 
-###Top differentially expressed genes (sorted by p-value)
+### Top differentially expressed genes (sorted by p-value)
 ```{r, diffExpAnalysis_4, echo=FALSE}
 resSig <- subset(res, padj < 0.1)
 if( dim(resSig)[1] == 0 ){
@@ -174,7 +174,7 @@ head(resSig)
 topGene = which( rownames(res) %in%  rownames(head(resSig)) )
 ```
 
-###Top down-regulated genes
+### Top down-regulated genes
 ```{r, diffExpAnalysis_5, echo=FALSE}
 tmp = resSig[ order( resSig$log2FoldChange ), ]
 tmp$UID = rownames(tmp)
@@ -182,7 +182,7 @@ tmp = merge(as.data.frame(tmp), minimalAnnotationDF, by="UID", sort=FALSE)
 head(tmp)
 ```
 
-###Top up-regulated genes
+### Top up-regulated genes
 ```{r, diffExpAnalysis_6, echo=FALSE}
 tmp = resSig[ order( -resSig$log2FoldChange ), ]
 tmp$UID = rownames(tmp)
@@ -190,16 +190,16 @@ tmp = merge(as.data.frame(tmp), minimalAnnotationDF, by="UID", sort=FALSE)
 head(tmp)
 ```
 
-###MA Plot highlighting the top 6 genes (sorted by adjusted p-value)
-```{r, fig.width=5, fig.height=5, fig.cap="MA Plot",dpi = 144, echo=FALSE}
+### MA Plot highlighting the top 6 genes (sorted by adjusted p-value)
+```{r, fig.width=8, fig.height=5, fig.cap="MA Plot",dpi = 200, echo=FALSE}
 plotMA(res, ylim=c(-5,5))
 with(res[topGene, ], {
-  points(baseMean, log2FoldChange, col="dodgerblue", cex=2, lwd=2)
-  text(baseMean, log2FoldChange, rownames(res[topGene, ]), pos=2, col="dodgerblue", cex=0.8)
+  points(baseMean, log2FoldChange, col="dodgerblue", cex=1.5, lwd=2)
+  text(baseMean, log2FoldChange, rownames(res[topGene, ]), pos=2, col="dodgerblue", cex=0.5)
 })
 ```
 
-###Creating a report of the top differentially expressed genes
+### Creating a report of the top differentially expressed genes
 ```{r, diffExpAnalysis_7, echo=FALSE}
 des2Report <- HTMLReport(shortName = "tmpReport",
                            title = "Differentially Expressed genes",
@@ -216,28 +216,28 @@ The report that contains the read count distribution for each gene can be access
 cat(  paste0("<a href=\"reports/tmpReport.html\"> ", "Top ",numberOfGenesToReport," differentially expressed genes  </a>") )
 ```
 
-##Diagnostic Plots
+## Diagnostic Plots
 
 Whether a gene is called significant depends not only on its LFC but also on its within-group variability, which DESeq2 quantifies as the dispersion. For strongly expressed genes, the dispersion can be understood as a squared coefficient of variation: a dispersion value of 0.01 means that the gene's expression tends to differ by typically sqrt(0.01) = 10% between samples of the same treatment group. For weak genes, the Poisson noise is an additional source of noise.
 
-###Dispersion estimation
-```{r, fig.width=5, fig.height=5, fig.cap="dispersion estimate",dpi = 144, echo=FALSE}
+### Dispersion estimation
+```{r, fig.width=5, fig.height=5, fig.cap="dispersion estimate",dpi = 200, echo=FALSE}
 plotDispEsts(dds)
 ```
 
 The black points are the dispersion estimates for each gene as obtained by considering the information from each gene separately. Unless one has many samples, these values fluctuate strongly around their true values. Therefore, we fit the red trend line, which shows the dispersions' dependence on the mean, and then shrink each gene's estimate towards the red line to obtain the final estimates (blue points) that are then used in the hypothesis test. The blue circles above the main "cloud" of points are genes which have high gene-wise dispersion estimates which are labelled as dispersion outliers. These estimates are therefore not shrunk toward the fitted trend line.
 
-###Histogram of the p-values 
+### Histogram of the p-values 
 ```{r, fig.width=5, fig.height=5, fig.cap="dispersion estimate",dpi = 144, echo=FALSE}
-hist(res$pvalue[res$baseMean > 1], breaks=20, col="grey50", border="white")
+hist(res$pvalue[res$baseMean > 1], breaks=20, col="grey50", border="white", main = "Pvalue Distribution", xlab="pvalue")
 ```
 
 Normally one should see a peak on the left side (genes with very small counts are excluded)
 
 
-#Gene Clustering
+# Gene Clustering
 
-##This heatmap shows the clustering of the 100 genes with the highest variance across samples
+## This heatmap shows the clustering of the 100 genes with the highest variance across samples
 ```{r, geneClustering_1, echo=FALSE}
 topVarGenes <- head(order(-rowVars(assay(rld))),100)
 ```
@@ -250,12 +250,55 @@ mat <- mat - rowMeans(mat)
 colnames(mat) <- rld$sampleName
 heatmap.2(mat, trace="none", col=colors, ColSideColors=sidecols,
           labRow=FALSE, mar=c(10,2), scale="row")
+
 ```
 
+## This heatmap shows the clustering of top differentially expressed p-value < 0.05 genes
+```{r, fig.width=10, fig.height=12, fig.cap="dispersion estimate",dpi = 220, echo=FALSE}
+colors <- colorRampPalette( rev(brewer.pal(9, "PuOr")) )(255)
+sidecols <- c("grey","dodgerblue")[ rld$condition ]
+mat <- assay(rld)[ rownames(resOrdered[resOrdered$pvalue < 0.05,]), ]
+mat <- mat - rowMeans(mat)
+colnames(mat) <- rld$sampleName
+tmp = resOrdered[resOrdered$pvalue < 0.05,]
+tmp$UID = rownames(tmp)
+tmp = merge( as.data.frame(tmp), minimalAnnotationDF, by="UID", sort=FALSE)
+rownames(mat) = tmp$Name
+# heatmap.2(mat, trace="none", col=colors, ColSideColors=sidecols,
+#           labRow=TRUE, mar=c(10,2), scale="row")
+heatmap.2(mat, trace="none", col=colors, ColSideColors=sidecols,
+          mar=c(10,15), scale="row")
 
-#Various Plots
-##MA Plot showing the biotype distribution
+```
 
+## This heatmap shows the clustering of top differentially expressed adjusted p-value < 0.05 genes
+```{r, fig.width=10, fig.height=12, fig.cap="dispersion estimate",dpi = 220, echo=FALSE}
+
+colors <- colorRampPalette( rev(brewer.pal(9, "PuOr")) )(255)
+sidecols <- c("grey","dodgerblue")[ rld$condition ]
+signCand = na.omit(which(resOrdered$padj < 0.1))
+
+if( length(signCand) > 1 ){
+  mat <- assay(rld)[ rownames(resOrdered[signCand,]), ]
+  mat <- mat - rowMeans(mat)
+  colnames(mat) <- rld$sampleName
+  tmp = resOrdered[signCand,]
+  tmp$UID = rownames(tmp)
+  tmp = merge( as.data.frame(tmp), minimalAnnotationDF, by="UID", sort=FALSE)
+  rownames(mat) = tmp$Name
+  # heatmap.2(mat, trace="none", col=colors, ColSideColors=sidecols,
+  #           labRow=TRUE, mar=c(10,2), scale="row")
+  heatmap.2(mat, trace="none", col=colors, ColSideColors=sidecols,
+            mar=c(10,15), scale="row")
+} else{
+  message("No candidates below adj.pval 0.1")
+}
+
+```
+
+# Various Plots
+
+## MA Plot showing the biotype distribution
 ````{r echo=FALSE }
 #Saving results
 dat = resOrdered
@@ -264,24 +307,17 @@ dat = merge(as.data.frame(dat), minimalAnnotationDF, by="UID", sort=FALSE)
 write.table(dat, "DETable.csv", sep="\t", col.names=TRUE, row.names=FALSE)
 ```
 
-```{r, fig.width=5, fig.height=5, fig.cap="MA Plot Biotype",dpi = 144, echo=FALSE}
+```{r, fig.width=8, fig.height=5, fig.cap="MA Plot Biotype",dpi = 200, echo=FALSE}
 dat$biotypeSummary = ifelse( !dat$biotype %in% c("antisense", "lincRNA", "miRNA", "snoRNA", "snRNA", "tRNA", "unknown", "rRNA"), "other", dat$biotype)
 # dat$biotypeSummary = ifelse( !dat$biotype %in% c("antisense", "lincRNA", "tRNA", "rRNA"), "other", dat$biotype)
 g1 = ggplot( dat, aes(x=log2(baseMean), y=log2FoldChange, color=biotypeSummary), environment=environment() ) + geom_point() + 
-  labs(title="MAPlot (Averaged over all arrays)", x="Intensity (A)", y="log2 Fold Change (M)")
-g1
-```
-
-```{r, fig.width=5, fig.height=5, fig.cap="MA Plot Biotype",dpi = 144, echo=FALSE}
-dat$biotypeSummary = ifelse( !dat$biotype %in% c("antisense", "lincRNA", "miRNA", "snoRNA", "snRNA", "tRNA", "unknown", "rRNA"), "other", dat$biotype)
-# dat$biotypeSummary = ifelse( !dat$biotype %in% c("antisense", "lincRNA", "tRNA", "rRNA"), "other", dat$biotype)
-g1 = ggplot( dat, aes(x=log2(baseMean), y=log2FoldChange, color=biotypeSummary), environment=environment() ) + geom_point() + 
-  labs(title="MAPlot (Averaged over all arrays)", x="Intensity (A)", y="log2 Fold Change (M)")
+  labs(title="MAPlot (Averaged over all arrays)", x="Intensity (A)", y="log2 Fold Change (M)") + 
+  geom_text( data = dat[1:20,],aes(label=Name), show_guide = FALSE, size=2, color="black")
 g1
 ```
 
 ### Vulcano Plot of the resulting Data
-```{r, fig.width=5, fig.height=5, fig.cap="Vulcano Plot",dpi = 144, echo=FALSE}
+```{r, fig.width=8, fig.height=5, fig.cap="Vulcano Plot",dpi = 200, echo=FALSE}
 dat$logPrev = -log10(dat$pvalue)
 g = ggplot( dat, aes(x=log2FoldChange, y=logPrev, colour = biotypeSummary), environment=environment() ) + geom_point() +
   labs(title="Vulcano Plot (Averaged over all arrays)", x="log2 Fold Change (M)", y="-log10(p-value)") + 
@@ -294,11 +330,11 @@ g
 ```
 
 ### Histogram of the ncRNA classes
-```{r, fig.width=5, fig.height=5, fig.cap="BioType distribution",dpi = 144, echo=FALSE}
+```{r, fig.width=6, fig.height=6, fig.cap="BioType distribution",dpi = 200, echo=FALSE}
 ggplot(dat, aes(x=biotype) ) + geom_histogram(stat="bin") + coord_flip()
 ```
 
-```{r, fig.width=5, fig.height=5, fig.cap="BioType intensity",dpi = 144, echo=FALSE}
+```{r, fig.width=8, fig.height=5, fig.cap="BioType intensity",dpi = 200, echo=FALSE}
 dat.hist = data.frame("Biotype"=names(table(dat$biotype)), "value"=as.numeric(table(dat$biotype)))
 
 dat.box1 = dat[,c("biotypeSummary","baseMean")]
@@ -337,3 +373,4 @@ save.image("workspace.rda")
 # } !#")
 # n2$print("chart1")
 ```
+

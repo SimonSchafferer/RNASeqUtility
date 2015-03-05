@@ -28,7 +28,7 @@ library(rCharts)
 ```
 
 ```{r preparation, echo=FALSE}
-#TESTING 
+#This following analysis is based on: http://www.bioconductor.org/help/workflows/rnaseqGene/
 load("Annotation.rda")
 setwd(rootDir)
 args <- commandArgs(TRUE)
