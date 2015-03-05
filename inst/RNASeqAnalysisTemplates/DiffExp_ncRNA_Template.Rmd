@@ -271,6 +271,31 @@ heatmap.2(mat, trace="none", col=colors, ColSideColors=sidecols,
 
 ```
 
+## This heatmap shows the clustering of top differentially expressed adjusted p-value < 0.05 genes
+```{r, fig.width=10, fig.height=12, fig.cap="dispersion estimate",dpi = 220, echo=FALSE}
+
+colors <- colorRampPalette( rev(brewer.pal(9, "PuOr")) )(255)
+sidecols <- c("grey","dodgerblue")[ rld$condition ]
+signCand = na.omit(which(resOrdered$padj < 0.1))
+
+if( length(signCand) > 1 ){
+  mat <- assay(rld)[ rownames(resOrdered[signCand,]), ]
+  mat <- mat - rowMeans(mat)
+  colnames(mat) <- rld$sampleName
+  tmp = resOrdered[signCand,]
+  tmp$UID = rownames(tmp)
+  tmp = merge( as.data.frame(tmp), minimalAnnotationDF, by="UID", sort=FALSE)
+  rownames(mat) = tmp$Name
+  # heatmap.2(mat, trace="none", col=colors, ColSideColors=sidecols,
+  #           labRow=TRUE, mar=c(10,2), scale="row")
+  heatmap.2(mat, trace="none", col=colors, ColSideColors=sidecols,
+            mar=c(10,15), scale="row")
+} else{
+  message("No candidates below adj.pval 0.1")
+}
+
+```
+
 # Various Plots
 
 ## MA Plot showing the biotype distribution
