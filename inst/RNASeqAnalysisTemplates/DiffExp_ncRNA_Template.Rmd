@@ -257,10 +257,12 @@ heatmap.2(mat, trace="none", col=colors, ColSideColors=sidecols,
 ```{r, fig.width=10, fig.height=12, fig.cap="dispersion estimate",dpi = 220, echo=FALSE}
 colors <- colorRampPalette( rev(brewer.pal(9, "PuOr")) )(255)
 sidecols <- c("grey","dodgerblue")[ rld$condition ]
-mat <- assay(rld)[ rownames(resOrdered[resOrdered$pvalue < 0.05,]), ]
+signCand = na.omit(which(resOrdered$padj < 0.05))
+
+mat <- assay(rld)[ rownames(resOrdered[signCand,]), ]
 mat <- mat - rowMeans(mat)
 colnames(mat) <- rld$sampleName
-tmp = resOrdered[resOrdered$pvalue < 0.05,]
+tmp = resOrdered[signCand,]
 tmp$UID = rownames(tmp)
 tmp = merge( as.data.frame(tmp), minimalAnnotationDF, by="UID", sort=FALSE)
 rownames(mat) = tmp$Name
