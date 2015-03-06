@@ -300,6 +300,14 @@ if( length(signCand) > 1 ){
 
 # Various Plots
 
+## Library Size Disttribution
+```{r, fig.width=6, fig.height=6, fig.cap="Library Size Distribution",dpi = 200, echo=FALSE}
+col.concent <- c("gold" , "red")
+barplot(colSums(counts(dds))*1e-6, names = colnames(counts), ylab="Library size (millions)",
+          col = col.concent[factor(samplesInfo$condition)], las = 2, cex.names = 0.5)
+legend("topleft", legend = levels(factor(samplesInfo$condition)), col = col.concent, pch = 15, cex = 0.7)
+```
+
 ## MA Plot showing the biotype distribution
 ````{r echo=FALSE }
 #Saving results
