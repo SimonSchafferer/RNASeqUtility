@@ -192,7 +192,7 @@ head(tmp)
 
 ### MA Plot highlighting the top 6 genes (sorted by adjusted p-value)
 ```{r, fig.width=8, fig.height=5, fig.cap="MA Plot",dpi = 200, echo=FALSE}
-plotMA(res, ylim=c(-5,5))
+plotMA(res)
 with(res[topGene, ], {
   points(baseMean, log2FoldChange, col="dodgerblue", cex=1.5, lwd=2)
   text(baseMean, log2FoldChange, rownames(res[topGene, ]), pos=2, col="dodgerblue", cex=0.5)
@@ -257,7 +257,7 @@ heatmap.2(mat, trace="none", col=colors, ColSideColors=sidecols,
 ```{r, fig.width=10, fig.height=12, fig.cap="dispersion estimate",dpi = 220, echo=FALSE}
 colors <- colorRampPalette( rev(brewer.pal(9, "PuOr")) )(255)
 sidecols <- c("grey","dodgerblue")[ rld$condition ]
-signCand = na.omit(which(resOrdered$padj < 0.05))
+signCand = na.omit(which(resOrdered$pvalue < 0.05))
 
 mat <- assay(rld)[ rownames(resOrdered[signCand,]), ]
 mat <- mat - rowMeans(mat)
