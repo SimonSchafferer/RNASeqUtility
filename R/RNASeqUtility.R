@@ -5,7 +5,7 @@
 #' @return read count table
 #' @docType methods
 #' @export
-generateCountFromMappingDF = function( bamToBedAndMergencRNAL ){
+generateCountFromMappingDF = function( bamToBedAndMergencRNAL, samplesInfo ){
   require(rtracklayer)
   
   ncRNAReadCountL = lapply( bamToBedAndMergencRNAL, function(x){
@@ -56,7 +56,7 @@ generateCountFromMappingDF = function( bamToBedAndMergencRNAL ){
   
   readsCountDF = readsCountDF[, c(1, grep("readCount", colnames(readsCountDF))) ]
   colnames(readsCountDF)[1] = "UID"
-  colnames(readsCountDF)[2:length(colnames(readsCountDF))] = samplesInfo$sampleName
+  colnames(readsCountDF)[2:length(colnames(readsCountDF))] = as.character(samplesInfo$sampleName)
   #Changing all NA values to zero
   readsCountDF[,2:length(colnames(readsCountDF))] = apply(readsCountDF[,2:length(colnames(readsCountDF))], 2, function(x){
     ifelse( is.na(x), 0, x)

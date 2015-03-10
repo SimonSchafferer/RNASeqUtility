@@ -48,7 +48,7 @@ readCompositionIdentity = 0.95 #This is used for clustering: If 0.95: At least 9
 
 #Differential Expression analysis parameters
 #Name and Path of the tab separated file containing the sample information
-samplesInfo = read.table(file=file.path(rootDir, "samplesInfo.csv"), sep="\t", header=TRUE) #should contain cloumn condition and column sample name
+samplesInfo = read.table(file=file.path(rootDir, "samplesInfo.csv"), sep="\t", header=TRUE, stringsAsFactors = FALSE) #should contain cloumn condition and column sample name
 if(!( "sampleName" %in% colnames(samplesInfo) & "condition"%in% colnames(samplesInfo))) {stop("Please provide a sampleInfo file with column condition and column sampleName")}
 
 #HERE THE LINEAR MODEL FOR DIFFERENTIAL EXPRESSION MAY BE DEFINED

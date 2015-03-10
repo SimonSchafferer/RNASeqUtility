@@ -338,7 +338,7 @@ contigAnnotTable_fin = merge( contigAnnotTable, bestMatch, by.x="contigID", by.y
 
 #Adding the reads to the annotation table
 contigsCountDF = read.table( file.path( getOutFilePath(getCLIApplication(multiBamCov_CLI_cmdRes)),getOutResultName(getOutResultReference(multiBamCov_CLI_cmdRes)) ), 
-                             sep="\t", header=FALSE)
+                             sep="\t", header=FALSE, stringsAsFactors = FALSE)
 colnames(contigsCountDF) = c("chr","chrStart","chrEnd","contigID","Uniqueness","strand",1:(dim(contigsCountDF)[2]-6) )
 contigAnnotTable_fin = merge(contigAnnotTable_fin, contigsCountDF, by="contigID")
 
@@ -349,7 +349,7 @@ write.table(contigAnnotTable_fin, file.path(annotationDir,"contigAnnotTable_fin.
 # load Coverage Matrix
 ############################
 count_contigsDF = read.table( file=file.path( getOutFilePath(getCLIApplication(multiBamCov_CLI_cmdRes)), getOutResultName(getOutResultReference(multiBamCov_CLI_cmdRes))), 
-                              sep="\t", header=FALSE )
+                              sep="\t", header=FALSE, stringsAsFactors = FALSE )
 colnames(count_contigsDF) = c("chr","start","end","contigID","uniqueness","strand",samplesInfo$sampleName)
 count_contigsGR = with(count_contigsDF, GRanges(chr, IRanges(start, end), uniqueness=uniqueness, strand=strand,contigID=contigID,
                                                 count_contigsDF[,7:dim(count_contigsDF)[2]]))

@@ -111,6 +111,59 @@ for( i in 1:length(bamToBedAndMergencRNAL)  ){
   }
 }
 
+######################
+# Samtools sorting ncRNAs
+######################
+samToolsSortncRNAmappingL = lapply( mappingncRNACLI_cmdResL, function(x){
+  
+  inFN = getOutResultName(getOutResultReference(x))
+  currPath = getOutFilePath(getCLIApplication(x))
+  
+  ######################
+  # Samtools sort
+  ######################
+  inFN = getOutResultName(getOutResultReference(x))
+  sortSam = Samtools_CLI(inFilePath=currPath, 
+                         inFileNames = inFN,
+                         cliParams =  c(""), 
+                         outputFlag = "_s", 
+                         outFilePath = currPath, 
+                         samtoolsApplication = "sort", 
+                         outputFormat = "bam")
+  sortBamCmdRes = generateCommandResult( object = sortSam )
+  
+  return( sortBamCmdRes )#samViewCmdRes
+} )
+
+for( i in 1:length(samToolsSortncRNAmappingL)  ){
+  tmpCommandLog = c(tmpCommandLog, getCommandLog(samToolsSortncRNAmappingL[[i]]) )
+}
+
+
+######################
+# BedGraph creation of sorted ncRNA mapping files
+######################
+genomeCovNcRNAMappingL = lapply( samToolsSortncRNAmappingL, function(x){
+  ######################
+  # BedGraph Of Sorted Sam Files
+  ######################
+  genomeCovCmdRes = CLIHelperPackage::Genomecov_CLI(inFilePath = getOutFilePath(getCLIApplication(x)), 
+                                                    inFileNames = getOutResultName(getOutResultReference(x)), 
+                                                    cliParams = "-bg", 
+                                                    outputFlag = ".bedgraph", 
+                                                    outFilePath = getOutFilePath(getCLIApplication(x)), 
+                                                    outFileName = sub(".bam",".bedgraph",getOutResultName(getOutResultReference(x))), 
+                                                    inFileBam = TRUE) 
+  
+  genomeCovCmdRes = generateCommandResult(genomeCovCmdRes)
+  
+  return( genomeCovCmdRes )#samViewCmdRes
+} )
+
+for( i in 1:length(genomeCovNcRNAMappingL)  ){
+  tmpCommandLog = c(tmpCommandLog, getCommandLog(genomeCovNcRNAMappingL[[i]]) )
+}
+
 ##########################################################################################################################
 #                   Mapping and assembly of potentially novel ncRNAs
 ##########################################################################################################################
@@ -219,6 +272,33 @@ for( i in 1:length(samToolsHTSeqCmdL)  ){
   for( j in 1:length(samToolsHTSeqCmdL[[i]])){
     tmpCommandLog = c(tmpCommandLog, getCommandLog(samToolsHTSeqCmdL[[i]][[j]]) )
   }
+}
+
+######################
+# BedGraph creation of sorted mapping files
+######################
+genomeCovMappingL = lapply( samToolsHTSeqCmdL, function(x){
+  
+  curr = x[[2]]#sortBamCmdRes2
+  ######################
+  # BedGraph Of Sorted Sam Files
+  ######################
+  genomeCovCmdRes = CLIHelperPackage::Genomecov_CLI(inFilePath = getOutFilePath(getCLIApplication(curr)), 
+                                                    inFileNames = getOutResultName(getOutResultReference(curr)), 
+                                                    cliParams = "-bg", 
+                                                    outputFlag = ".bedgraph", 
+                                                    outFilePath = getOutFilePath(getCLIApplication(curr)), 
+                                                    outFileName = sub(".bam",".bedgraph",getOutResultName(getOutResultReference(curr))), 
+                                                    inFileBam = TRUE) 
+  
+  genomeCovCmdRes = generateCommandResult(genomeCovCmdRes)
+  #   tmpCommandLog = c(tmpCommandLog, getCommandLog(genomeCovCmdRes))
+  
+  return( genomeCovCmdRes )#samViewCmdRes
+} )
+
+for( i in 1:length(genomeCovMappingL)  ){
+  tmpCommandLog = c(tmpCommandLog, getCommandLog(genomeCovMappingL[[i]]) )
 }
 
 #############################################
@@ -408,7 +488,65 @@ cmdExecTime = proc.time() - cmdExecTime
 cmdExecTime
 
 ncRNAreadCountDF = tryCatch({
-  ncRNAreadCountDF = generateCountFromMappingDF(bamToBedAndMergencRNAL)  
+  #Workaround, remove when fixed
+  generateCountFromMappingDF_inside = function (bamToBedAndMergencRNAL, samplesInfo)
+  {
+    require(rtracklayer)
+    ncRNAReadCountL = lapply(bamToBedAndMergencRNAL, function(x) {
+      x = x[[2]]
+      dir = getOutFilePath(getCLIApplication(x))
+      return(import(file.path(dir, getOutResultName(getOutResultReference(x))),
+                    format = "BED", asRangedData = FALSE))
+    })
+    overallTable = unique(do.call(rbind, lapply(ncRNAReadCountL,
+                                                function(x) {
+                                                  xdf = as.data.frame(x)
+                                                  colnames(xdf) = c("transcript_id", "mapStart", "mapEnd",
+                                                                    "mapWidth", "mapStrand", "readCount", "mapQ")
+                                                  xdf$UID = paste0(xdf$transcript_id, ifelse(xdf$mapStrand ==
+                                                                                               "-", "_minus", "_plus"))
+                                                  return(xdf[, c("transcript_id", "UID")])
+                                                })))
+    rownames(overallTable) = 1:dim(overallTable)[1]
+    readsCountDF = do.call(cbind, lapply(ncRNAReadCountL, function(x) {
+      xdf = as.data.frame(x)
+      colnames(xdf) = c("transcript_id", "mapStart", "mapEnd",
+                        "mapWidth", "mapStrand", "readCount", "mapQ")
+      xdf$UID = paste0(xdf$transcript_id, ifelse(xdf$mapStrand ==
+                                                   "-", "_minus", "_plus"))
+      xdf = do.call(rbind, lapply(split(xdf, xdf$UID), function(x) {
+        xnew = x[1, ]
+        xsize = dim(x)[1]
+        if (xsize != 1) {
+          xnew$mapStart = min(as.numeric(x$mapStart))
+          xnew$mapEnd = min(as.numeric(x$mapEnd))
+          xnew$readCount = sum(as.numeric(x$readCount),
+                               na.rm = TRUE)
+          xnew$mapQ = mean(as.numeric(x$mapQ), na.rm = TRUE)
+        }
+        return(xnew)
+      }))
+      xdf_merged = merge(overallTable, xdf[, c("UID", "readCount",
+                                               "mapStart", "mapEnd")], by = "UID", all.x = TRUE)
+      return(xdf_merged)
+    }))
+    mapStart = readsCountDF[, grep("mapStart", colnames(readsCountDF))]
+    mapStart = apply(mapStart, 1, min, na.rm = TRUE)
+    mapEnd = readsCountDF[, grep("mapEnd", colnames(readsCountDF))]
+    mapEnd = apply(mapEnd, 1, min, na.rm = TRUE)
+    readsCountDF = readsCountDF[, c(1, grep("readCount", colnames(readsCountDF)))]
+    colnames(readsCountDF)[1] = "UID"
+    colnames(readsCountDF)[2:length(colnames(readsCountDF))] = as.character(samplesInfo$sampleName)
+    readsCountDF[, 2:length(colnames(readsCountDF))] = apply(readsCountDF[,
+                                                                          2:length(colnames(readsCountDF))], 2, function(x) {
+                                                                            ifelse(is.na(x), 0, x)
+                                                                          })
+    readsCountDF$mapStart = mapStart
+    readsCountDF$mapEnd = mapEnd
+    return(readsCountDF)
+  }
+  
+  ncRNAreadCountDF = generateCountFromMappingDF_inside(bamToBedAndMergencRNAL, samplesInfo)  
   write.table( ncRNAreadCountDF, file.path(readCountsDir, "ncRNAreadCountDF.csv"), sep="\t", col.names=TRUE, row.names=TRUE )
   return(ncRNAreadCountDF)
 }, warning = function(w) {
