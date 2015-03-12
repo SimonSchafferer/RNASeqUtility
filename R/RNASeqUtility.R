@@ -1,3 +1,260 @@
+#' @title Generate coverage data frame for specific candidates
+#'
+#' @description This method returns a data frame containing coverage values for each position. It is intended for genome mapping results. For ncRNA mappings please see: generateCoverageDF_ncRNAmappings
+#' @param contigsGR GRanges file containing the coordinates of the contigs and their contigID (specified as contigID in the metadata)
+#' @param contigResTable Selected candidates from the result of differential expression analysis from DESeq2 combined with the minimum annotation dataframe
+#' @param bedgraphMapping_plusL the cmdResult object of the bedgraph plus mapping (genomeCovNcRNAMapping_plusL) 
+#' @param bedgraphMapping_minusL the cmdResult object of the bedgraph minus mapping (genomeCovNcRNAMapping_minusL) 
+#' @param sampleNames names of the samples from samplesInfo table
+#' @param annotationGR An otpional annotation GRanges object, when provided the annotation will be used as reference interval
+#' @return data.frame containing the read counts for each position in order to create a histogram of read counts for each ncRNA
+#' @docType methods
+#' @export
+generateCoverageDF_contigs = function(contigsGR, contigResTable, bedgraphMapping_plusL, bedgraphMapping_minusL, sampleNames, annotationGR){
+  require(rtracklayer)
+  require(GenomicRanges)
+  
+  colsRequired = c("ID","UID","biotype","Name","log2FoldChange","pvalue","padj","strandness")
+  if( sum( colsRequired %in% colnames(resAnnot) ) != length(colsRequired) ){
+    stop( paste0( "Columns: ",paste0(colsRequired,collapse=", ")," have to be provided!"))
+  }
+  
+  #Combining to GRanges object
+  roisContigs = contigsGR[ contigsGR$contigID %in% contigResTable$UID ]
+  elementMetadata(roisContigs) = merge( elementMetadata( roisContigs ), contigResTable, by.x="contigID", by.y="UID" ,sort=FALSE)
+  roisContigsL = GenomicRanges::split(roisContigs, roisContigs$ID)
+  
+  bedgraphncRNAMapping_plusL = lapply( bedgraphMapping_plusL, function(x){
+    rtracklayer::import(file.path(getOutFilePath(getCLIApplication(x)), getOutResultName(getOutResultReference(x))), 
+           asRangedData=FALSE, format="bedGraph")
+  } )
+  bedgraphncRNAMapping_minusL = lapply( bedgraphMapping_minusL, function(x){
+    rtracklayer::import(file.path(getOutFilePath(getCLIApplication(x)), getOutResultName(getOutResultReference(x))), 
+           asRangedData=FALSE, format="bedGraph")
+  } )
+  
+  
+  if(missing(annotationGR)){
+    
+    roiL = vector("list", length(bedgraphncRNAMapping_plusL))
+    
+    for(i in c(1:length(bedgraphncRNAMapping_plusL))){
+      bgminus = bedgraphncRNAMapping_minusL[[i]]
+      bgplus = bedgraphncRNAMapping_plusL[[i]]
+      
+      roiL_contig = lapply( roisContigsL  , function(x){
+        
+        if( as.character(strand(x)) == "+"  ){
+          rnaOI = GenomicRanges::subsetByOverlaps(bgplus,x )
+        }else{
+          rnaOI = GenomicRanges::subsetByOverlaps(bgminus,x )
+        }    
+        
+        if(length(rnaOI) != 0){
+          #Filling the gaps in the coverage file by creating a one base based annotation with zero score! 
+          rnaOI_fill = GRanges( as.character(seqnames(rnaOI))[1], 
+                                IRanges(
+                                  start=start(rnaOI)[1]:(end(rnaOI)[length(rnaOI)]-1),
+                                  end=(start(rnaOI)[1]+1):end(rnaOI)[length(rnaOI)] ),
+                                score=rep(0, end(rnaOI)[length(rnaOI)]-start(rnaOI)[1] ) )
+          
+          fillGR = GenomicRanges::setdiff( rnaOI_fill, rnaOI )
+          
+          if( length(fillGR) > 0 ){
+            fillGR$score = 0
+            rnaOI = IRanges::append( rnaOI, fillGR)
+          }          
+        }
+        
+        rnaOICov = rep(rnaOI$score, width(rnaOI))#
+        if( length(rnaOICov) == 0  ){
+          rnaOICovDF = NULL
+        } else{
+          rnaOICovDF = data.frame( "Idx"=1:length(rnaOICov), 
+                                   "ReadCount"=rnaOICov, 
+                                   "group"=x$biotype, 
+                                   "Name"=x$Name,
+                                   "ID"=x$ID, 
+                                   "regulation"=ifelse( x$log2FoldChange > 0, "up", "down"), 
+                                   "log2FoldChange"=x$log2FoldChange,
+                                   "pvalue"=x$pvalue,
+                                   "padj"=x$padj,
+                                   "strandness"=x$strandness
+          )
+          
+        } 
+        
+        return(rnaOICovDF)
+      } )
+      roi_ncOtherDF = do.call(rbind, roiL_contig)
+      roi_ncOtherDF$Sample = ifelse(missing(sampleNames),paste0("Sample",i), sampleNames[i])
+      roiL[[i]] = roi_ncOtherDF
+    }
+    return(roiL)
+  } else{
+    
+    currMap = GenomicRanges::findOverlaps(annotationGR, roisContigs)
+    currMap = currMap[ !queryHits(currMap) %in% queryHits(currMap)[which(duplicated( queryHits(currMap)))]  ]
+    
+    roisContigs = roisContigs[subjectHits(currMap)]
+    annotationGR = annotationGR[queryHits(currMap)]
+    
+    roiL = vector("list", length(bedgraphncRNAMapping_plusL))
+    
+    for(i in c(1:length(bedgraphncRNAMapping_plusL))){
+      bgminus = bedgraphncRNAMapping_minusL[[i]]
+      bgplus = bedgraphncRNAMapping_plusL[[i]]
+      
+      roicL = vector("list", length(roisContigs)) 
+      for(k in 1:length(roisContigs)){
+        contig = roisContigs[k]
+        refAnnot = annotationGR[k]
+        
+        if( as.character(strand(contig)) == "+"  ){
+          rnaOI = GenomicRanges::subsetByOverlaps(bgplus,refAnnot )
+        }else{
+          rnaOI = GenomicRanges::subsetByOverlaps(bgminus,refAnnot )
+        }    
+        
+        if( start(rnaOI)[1] > start(refAnnot) ){
+          toAdd = (length( start(refAnnot):start(rnaOI)[1] ))
+          beforeToAdd = GRanges( seqnames(rnaOI)[1], IRanges( (start(rnaOI)[1]-toAdd+1), (start(rnaOI)[1]-1) ), score=0 )
+          rnaOI = IRanges::append(rnaOI, beforeToAdd)
+        } else{
+          start(rnaOI)[1] = start(refAnnot)
+        }
+        
+        if(end(refAnnot) > end(rnaOI)[length(rnaOI)]){
+          toAdd = length( end(rnaOI)[length(rnaOI)]:end(refAnnot) )
+          afterToAdd = GRanges( seqnames(rnaOI)[1], IRanges( (end(rnaOI)[length(rnaOI)]+1), 
+                                                             (end(rnaOI)[length(rnaOI)]+toAdd-1  ) ), score=0 )
+          rnaOI = IRanges::append(rnaOI, afterToAdd)
+        } else{
+          end(rnaOI)[length(end(rnaOI))] = end(refAnnot)
+        } 
+        
+        #Filling the gaps in the coverage file by creating a one base based annotation with zero score! 
+        refAnnot_fill = GRanges( as.character(seqnames(refAnnot))[1], 
+                                 IRanges(
+                                   start=start(refAnnot):(end(refAnnot)-1),
+                                   end=(start(refAnnot)+1):end(refAnnot) ),
+                                 score=rep(0,width(refAnnot)-1))
+        
+        fillGR = GenomicRanges::setdiff( refAnnot_fill, rnaOI )
+        
+        if( length(fillGR) > 0 ){
+          fillGR$score = 0
+          rnaOI = IRanges::append( rnaOI, fillGR)
+        }
+        
+        rnaOI = sort(rnaOI)
+        
+        rnaOICov = rep(rnaOI$score, width(rnaOI))#
+        
+        rnaOICovDF = data.frame( "Idx"=1:length(rnaOICov), 
+                                 "ReadCount"=rnaOICov, 
+                                 "group"=contig$biotype, 
+                                 "Name"=contig$Name,
+                                 "ID"=contig$ID, 
+                                 "regulation"=ifelse( contig$log2FoldChange > 0, "up", "down"), 
+                                 "log2FoldChange"=contig$log2FoldChange,
+                                 "pvalue"=contig$pvalue,
+                                 "padj"=contig$padj,
+                                 "strandness"=contig$strandness
+        )
+        roicL[[k]] = rnaOICovDF
+      }
+      roiDF = do.call(rbind, roicL)
+      roiDF$Sample = ifelse(missing(sampleNames),paste0("Sample",i), sampleNames[i])
+      roiL[[i]] = roiDF
+    }
+    return(roiL)
+  }
+}
+
+
+#' @title Generate coverage data frame for specific candidates
+#'
+#' @description This method returns a data frame containing coverage values for each position. It is intended for ncRNAmapping results. For contigs please see: generateCoverageDF_contigs
+#' @param ncRNAMappingsDF Selected candidates from the result of differential expression analysis from DESeq2 combined with the minimum annotation dataframe
+#' @param bedgraphMapping_plusL the cmdResult object of the bedgraph plus mapping (genomeCovNcRNAMapping_plusL) 
+#' @param bedgraphMapping_minusL the cmdResult object of the bedgraph minus mapping (genomeCovNcRNAMapping_minusL) 
+#' @param sampleNames names of the samples from samplesInfo table
+#' @return data.frame containing the read counts for each position in order to create a histogram of read counts for each ncRNA
+#' @docType methods
+#' @export
+generateCoverageDF_ncRNAmappings = function( ncRNAMappingsDF, bedgraphMapping_plusL, bedgraphMapping_minusL, sampleNames ){
+  require(rtracklayer)
+  require(GenomicRanges)
+  colsRequired = c("ID","UID","biotype","Name","log2FoldChange","pvalue","padj","strandness")
+  if( sum( colsRequired %in% colnames(resAnnot) ) != length(colsRequired) ){
+    stop( paste0( "Columns: ",paste0(colsRequired,collapse=", ")," have to be provided!"))
+  }
+  
+  ncRNAMappingsDF$ID = sub("_plus.*$","",ncRNAMappingsDF$UID)
+  ncRNAMappingsDF$ID = sub("_minus.*$","",ncRNAMappingsDF$ID)
+  
+  bedgraphncRNAMapping_plusL = lapply( bedgraphMapping_plusL, function(x){
+    rtracklayer::import(file.path(getOutFilePath(getCLIApplication(x)), getOutResultName(getOutResultReference(x))), 
+           asRangedData=FALSE, format="bedGraph")
+  } )
+  bedgraphncRNAMapping_minusL = lapply( bedgraphMapping_minusL, function(x){
+    rtracklayer::import(file.path(getOutFilePath(getCLIApplication(x)), getOutResultName(getOutResultReference(x))), 
+           asRangedData=FALSE, format="bedGraph")
+  } )
+  
+  ncRNAMappingsDFL = split(ncRNAMappingsDF, ncRNAMappingsDF$UID)
+  
+  roiL = vector("list", length(bedgraphncRNAMapping_plusL))
+  
+  for(i in c(1:length(bedgraphncRNAMapping_plusL))){
+    bgminus = bedgraphncRNAMapping_minusL[[i]]
+    bgplus = bedgraphncRNAMapping_plusL[[i]]
+    
+    roi_ncOtherL = lapply( ncRNAMappingsDFL  , function(x){
+      
+      #First decide if plus or minus according to UID
+      if( length(grep("minus",x$UID)) == 0  ){
+        currGR = bgplus[seqnames( bgplus ) ==  x$ID]
+      }else{
+        currGR = bgminus[seqnames( bgminus ) ==  x$ID]
+      }    
+      
+      #Filling the gaps in the coverage file by creating a one base based annotation with zero score! 
+      rnaOI_fill = GRanges( as.character(seqnames(currGR))[1], 
+                            IRanges(
+                              start=start(currGR)[1]:(end(currGR)[length(currGR)]-1),
+                              end=(start(currGR)[1]+1):end(currGR)[length(currGR)] ),
+                            score=rep(0, end(currGR)[length(currGR)]-start(currGR)[1] ) )
+      
+      fillGR = GenomicRanges::setdiff( rnaOI_fill, currGR )
+      
+      if( length(fillGR) > 0 ){
+        fillGR$score = 0
+        currGR = IRanges::append( currGR, fillGR)
+      }
+      
+      rnaOICov = rep(currGR$score, width(currGR))#
+      rnaOICovDF = data.frame( "Idx"=1:length(rnaOICov), 
+                               "ReadCount"=rnaOICov, 
+                               "group"=x$biotype, 
+                               "Name"=x$Name,
+                               "ID"=x$ID, 
+                               "regulation"=ifelse( x$log2FoldChange > 0, "up", "down"), 
+                               "log2FoldChange"=x$log2FoldChange,
+                               "pvalue"=x$pvalue,
+                               "padj"=x$padj,
+                               "strandness"=x$strandness )
+      return(rnaOICovDF)
+    } )
+    roi_ncOtherDF = do.call(rbind, roi_ncOtherL)
+    roi_ncOtherDF$Sample = ifelse(missing(sampleNames),paste0("Sample",i), sampleNames[i])
+    roiL[[i]] = roi_ncOtherDF
+  }
+  return(roiL)
+}
+
+
 #' @title Generate Count table
 #'
 #' @description This method combines the read counts after counting them  with mergeBed from bam files
@@ -7,18 +264,17 @@
 #' @export
 generateCountFromMappingDF = function( bamToBedAndMergencRNAL, samplesInfo ){
   require(rtracklayer)
+  require(GenomicRanges)
   
   ncRNAReadCountL = lapply( bamToBedAndMergencRNAL, function(x){
     x = x[[2]]
-    
     dir = getOutFilePath(getCLIApplication(x))
-    
-    return( import( file.path( dir,getOutResultName(getOutResultReference(x))), format="BED",asRangedData=FALSE ) )
+    return( rtracklayer::import( file.path( dir,getOutResultName(getOutResultReference(x))), format="BED",asRangedData=FALSE ) )
   })
   
   #Create a reference dataframe containing all entries (Ensembl ids plus strand as ID)
   overallTable = unique(do.call( rbind, lapply( ncRNAReadCountL, function(x){
-    xdf = as.data.frame(x)
+    xdf = GenomicRanges::as.data.frame(x)
     colnames(xdf) = c("transcript_id", "mapStart","mapEnd","mapWidth","mapStrand","readCount","mapQ")
     xdf$UID = paste0(xdf$transcript_id, ifelse(xdf$mapStrand == "-", "_minus", "_plus") )
     return(xdf[,c("transcript_id","UID")])
@@ -28,7 +284,7 @@ generateCountFromMappingDF = function( bamToBedAndMergencRNAL, samplesInfo ){
   
   #Now merge with counted reads
   readsCountDF = do.call( cbind, lapply( ncRNAReadCountL, function(x){
-    xdf = as.data.frame(x)
+    xdf = GenomicRanges::as.data.frame(x)
     colnames(xdf) = c("transcript_id", "mapStart","mapEnd","mapWidth","mapStrand","readCount","mapQ")
     xdf$UID = paste0(xdf$transcript_id, ifelse(xdf$mapStrand == "-", "_minus", "_plus") )
     #Merge The duplicated UIDs
@@ -308,13 +564,13 @@ clusterMultiMappingReads_stringent = function( contigForCountingGR_unclustered, 
 #   currBamFile = 1
   
   contigForCountingGR_unclustered = contigForCountingGR_unclustered[order(contigForCountingGR_unclustered$uniqueness, contigForCountingGR_unclustered$readCount, decreasing=TRUE)]
-  overlapMap = findOverlaps( contigForCountingGR_unclustered, allReads )  
+  overlapMap = GenomicRanges::findOverlaps( contigForCountingGR_unclustered, allReads )  
   
   if( length(unique(queryHits(overlapMap))) != length(contigForCountingGR_unclustered) ){
     warning("Some contigs have zero reads in in one sample within a group, therefore these contigs are removed from the analysis! 
             One could avoid this by intersecting all bam files with the contig files")
     contigForCountingGR_unclustered = contigForCountingGR_unclustered[ unique(queryHits(overlapMap) )]
-    overlapMap = findOverlaps( contigForCountingGR_unclustered, allReads )      
+    overlapMap = GenomicRanges::findOverlaps( contigForCountingGR_unclustered, allReads )      
   }
     
   allClustered = TRUE
