@@ -19,22 +19,31 @@ library("edgeR")
 library(RNASeqUtility)
 require(rtracklayer)
 
-rownames(count_contigsDF ) = count_contigsDF$contigID
-rownames(ensReadsCountDF_clustered ) = ensReadsCountDF_clustered$UID
-counts = ensReadsCountDF_clustered[,3:(2+length(samplesInfo$condition))]
-counts = rbind(counts, count_contigsDF[,7:dim(count_contigsDF)[2]])
-counts_tmp = as.data.frame(apply(counts, 2, as.numeric))
-rownames(counts_tmp) = rownames(counts)
+#Filter ENSEMBL ANNOTATION BY BIOTYPE
+ensReadsCountDF_clustered_filt = ensReadsCountDF_clustered[ which( !ensReadsCountDF_clustered$gene_biotype %in% c("miRNA","snoRNA") ), ]
+
+countsEns = apply(ensReadsCountDF_clustered_filt[,(which(colnames(ensReadsCountDF_clustered_filt) == "UID")+1) : (which(colnames(ensReadsCountDF_clustered_filt) == "mapStart")-1)],2,as.numeric)
+rownames(countsEns) = ensReadsCountDF_clustered_filt$UID
+keep = rowSums(countsEns == 0) <= (dim(countsEns)[2]/2)+1
+countsEns = countsEns[keep,]
+
+countsContigs = apply(contigAnnotTable_fin[,grep("^[0-9]+$",colnames(contigAnnotTable_fin))],2,as.numeric)
+rownames(countsContigs) = contigAnnotTable_fin$contigID
+keep = rowSums(countsContigs == 0) <= (dim(countsContigs)[2]/2)+1
+countsContigs = countsContigs[keep,]
 
 if( dim(otherReadsCountDF)[1] > 0 ){
-  otherReadsCountDF_tmp = otherReadsCountDF[, which( !colnames(otherReadsCountDF) %in% c("mapStart","mapEnd")  ) ]
-  otherReadsCountDF_tmp = otherReadsCountDF_tmp[,-1]
-  otherReadsCountDF_tmp = as.data.frame(apply(otherReadsCountDF_tmp, 2, as.numeric))
-  rownames(otherReadsCountDF_tmp) = otherReadsCountDF[,1]
-  counts_tmp = rbind( counts_tmp, otherReadsCountDF_tmp  )
+  countsOther = apply(otherReadsCountDF[,(which(colnames(otherReadsCountDF) == "UID")+1) : (which(colnames(otherReadsCountDF) == "mapStart")-1)],2,as.numeric)
+  rownames(countsOther) = otherReadsCountDF$UID
+  keep = rowSums(countsOther == 0) <= (dim(countsOther)[2]/2)+1
+  countsOther = countsOther[keep,]
+  
+  counts = rbind( countsEns, countsContigs)
+  counts = rbind( counts, countsOther)
+} else{
+  counts = rbind( countsEns, countsContigs)
 }
 
-counts = counts_tmp
 #GET ALL COUNT Data othe
 cpms = cpm(counts)
 keep = rowSums(cpms > 1) >=2
@@ -103,11 +112,6 @@ write.table(tt$table, file=file.path(diffExpDir,"toptags_edgeR.csv"), sep="\t")
 ####################################################################################
 
 library("DESeq")
-
-# libDesign = data.frame("condition"=samplesInfo$condition, "libType"=rep("single-end",length(samplesInfo$condition)))
-# cds = newCountDataSet( counts_tmp, samplesInfo$condition)
-# counts.filtered = counts[-grep("contig",rownames(counts)),]
-# counts.filtered = counts.filtered[apply(counts.filtered,1,min) != 0,]
 
 cds = newCountDataSet( counts, samplesInfo$condition)
 

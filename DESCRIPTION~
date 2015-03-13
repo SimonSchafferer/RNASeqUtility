@@ -4,7 +4,25 @@ Title: ncRNA RNA-Seq analysis utilities
 Version: 1.0
 Date: 2015-01-19
 Author: Simon Schafferer
-Maintainer: Who to complain to <yourfault@somewhere.net>
-Description: This package contains helper Methods for RNA-Seq analysis and provides templates in RNASeqAnalysisTemplates folder
+Maintainer: Who to complain to <simon.schafferer@i-med.ac.at>
+
+Description: This package contains helper Methods for RNA-Seq analysis and
+    provides templates in RNASeqAnalysisTemplates folder
 License: MIT
-Depends: CLIHelperPackage, sncRNAannotation
+Depends:
+    CLIHelperPackage,
+    sncRNAannotation,
+    ggplot2, 
+    rtracklayer, 
+    biomaRt,
+    BSgenome,
+    edgeR,
+    DESeq,
+    edgeR,
+    gplots,
+    RColorBrewer,
+    genefilter, 
+    DESeq2, 
+    ReportingTools, 
+    rCharts, 
+    googleVis
