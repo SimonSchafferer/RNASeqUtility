@@ -113,31 +113,31 @@ write.table(tt$table, file=file.path(diffExpDir,"toptags_edgeR.csv"), sep="\t")
 
 library("DESeq")
 
-cds = newCountDataSet( counts, samplesInfo$condition)
+cds = DESeq::newCountDataSet( counts, samplesInfo$condition)
 
-cds = estimateSizeFactors(cds)
+cds = DESeq::estimateSizeFactors(cds)
 sizeFactors(cds)
 
-cdsB = estimateDispersions(cds, method="blind")
-vsd = varianceStabilizingTransformation(cdsB)
-p = plotPCA(vsd,ntop = 100,intgroup =c("condition")  )
+cdsB = DESeq::estimateDispersions(cds, method="blind")
+vsd = DESeq::varianceStabilizingTransformation(cdsB)
+p = DESeq::plotPCA(vsd,ntop = 100,intgroup =c("condition")  )
 
 png(filename = file.path(diffExpDir,"DESeq_PCA.png"))
 p
 dev.off()
 
-cds = estimateDispersions(cds)
+cds = DESeq::estimateDispersions(cds)
 
 png(filename = file.path(diffExpDir,"DESeq_DispersionEstimation.png"))
-plotDispEsts(cds)
+DESeq::plotDispEsts(cds)
 dev.off()
 
 conditionsNbinom = unique(samplesInfo$condition)
 
-res = nbinomTest(cds,condA = conditionsNbinom[1], condB=conditionsNbinom[2])
+res = DESeq::nbinomTest(cds,condA = conditionsNbinom[1], condB=conditionsNbinom[2])
 
 png(filename = file.path(diffExpDir,"DESeq_MA.png"))
-plotMA(res)
+DESeq::plotMA(res)
 dev.off()
 # resSig = res[which(res$padj < 0.1),]
 # head(resSig[order(resSig$log2FoldChange, decreasing=TRUE, )])
@@ -147,5 +147,6 @@ deseqTable = res[ order(res$pval, decreasing=FALSE),]
 write.table(deseqTable, file=file.path(diffExpDir,"toptags_DESeq.csv"))
 
 save.image(file.path(rootDir, "DifferentialExpression.rda"))
+
 
 
