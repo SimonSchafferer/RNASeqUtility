@@ -1,3 +1,77 @@
+
+#' @title Calculate Normalized Read Count Coverage
+#'
+#' @description This method returns a data frame containing normalized coverage values for each position. It requires the output of calcReadCountCoveragePerCondition or generateCoverageDF_contigs as data.frame or list
+#' @param coverageL  output of calcReadCountCoveragePerCondition/generateCoverageDF_contigs
+#' @param deseqds DESeq object of the current data
+#' @return data.frame containing the normalized read counts for each position in order to create a histogram of read counts for each ncRNA
+#' @docType methods
+#' @export
+calcNormReadCountCoverage = function( coverageL, deseqds ){
+    #Converting list to data.frame
+    coverageDF = do.call(rbind, coverageL)
+  
+  if( sum(colnames(coverageDF) == "Sample") == 0 ){
+    stop(paste0("Column 'Sample' must be present in coverageDF!"))
+  }
+  
+  coverageDFL = split(coverageDF, factor( coverageDF$Sample, levels=unique(coverageDF$Sample), ordered=FALSE  ) )
+  if( sum(names(coverageDFL) == dds$sampleName) != length(dds$sampleName) ){
+    stop("SampleNames must be the same in the DESeq object and the coverageDF")
+  }
+  
+  coverageDF = do.call(rbind,mapply(function(x,y){
+    x$ReadCountNorm = x$ReadCount / y
+    return(x)
+  }, coverageDFL, sizeFactors(deseqds), SIMPLIFY = FALSE) )
+  
+  return(coverageDF)
+}
+
+#' @title Splits coverage list per condition
+#'
+#' @description Splits the list obtained by calcReadCountCoveragePerCondition/generateCoverageDF_contigs by condition and calculates the mean read coverage per condition
+#' @param coverageL  output of calcReadCountCoveragePerCondition/generateCoverageDF_contigs
+#' @param deseqds DESeq object of the current data
+#' @param samplesInfo describing the experiment (produced by configuration template)
+#' @return data.frame containing the normalized read counts for each position in order to create a histogram of read counts for each ncRNA
+#' @docType methods
+#' @export
+splitReadCountCoveragePerCondition = function( coverageL, deseqds, samplesInfo ){
+  
+  coverageDF = RNASeqUtility::calcNormReadCountCoverage(coverageL, deseqds)
+  #Mapping condition to sample groups
+  coverageDF = do.call(rbind, lapply(  split(coverageDF,coverageDF$Sample), function(x){
+    x$condition = samplesInfo[ which(samplesInfo$sampleName == x$Sample[1]),]$condition
+    return(x)
+  }))
+  
+  #Splitting the data frame by condition and calculating the mean coverage over samples
+  coverageDFL = split( coverageDF, coverageDF$condition)
+  coverageDFL = lapply(coverageDFL, function(x){
+    
+    ncRNAClassL = split(x, x$ID)
+    
+    ncRNAClassL_mod = lapply( ncRNAClassL , function(y){
+      coordL = split(y, y$Idx)
+      
+      coordL_modL = lapply( coordL, function(z){
+        z$ReadMeans = mean( z$ReadCount, na.omit=TRUE )
+        z$ReadMeansNorm = mean( z$ReadCountNorm, na.omit=TRUE )
+        return(z)
+      })
+      coordL_mod = do.call(rbind,coordL_modL)
+      
+      return(coordL_mod)
+    })
+    return(do.call(rbind, ncRNAClassL_mod))
+  })
+  
+  return( do.call(rbind, coverageDFL) )
+  
+}
+
+
 #' @title Generate coverage data frame for specific candidates
 #'
 #' @description This method returns a data frame containing coverage values for each position. It is intended for genome mapping results. For ncRNA mappings please see: generateCoverageDF_ncRNAmappings
@@ -116,6 +190,11 @@ generateCoverageDF_contigs = function(contigsGR, contigResTable, bedgraphMapping
           rnaOI = GenomicRanges::subsetByOverlaps(bgminus,refAnnot )
         }    
         
+        if(length(rnaOI) == 0){
+          #No coverage information available in this library!
+          return(data.frame())
+        }
+        
         if( start(rnaOI)[1] > start(refAnnot) ){
           toAdd = (length( start(refAnnot):start(rnaOI)[1] ))
           beforeToAdd = GRanges( seqnames(rnaOI)[1], IRanges( (start(rnaOI)[1]-toAdd+1), (start(rnaOI)[1]-1) ), score=0 )
@@ -219,6 +298,11 @@ generateCoverageDF_ncRNAmappings = function( ncRNAMappingsDF, bedgraphMapping_pl
       }else{
         currGR = bgminus[seqnames( bgminus ) ==  x$ID]
       }    
+      
+      if(length(currGR) == 0) {
+        #Too less reads, in the mapping file are no reads available
+        return(data.frame())
+      }
       
       #Filling the gaps in the coverage file by creating a one base based annotation with zero score! 
       rnaOI_fill = GRanges( as.character(seqnames(currGR))[1], 

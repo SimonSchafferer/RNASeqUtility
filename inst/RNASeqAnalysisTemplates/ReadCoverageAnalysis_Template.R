@@ -41,6 +41,18 @@ p2 = ggplot(data = roi_ncOtherDF, aes(x=Idx,y = ReadCount, color=Sample)) + geom
   facet_wrap( ~ID, ncol=floor( sqrt( length( unique(roi_ncOtherDF$ID) ) )), scales = "free")
 ggsave(p2, filename = "otherncRNAsCoverage.png")
 
+#####################################################################
+#     Coverage plots with mean normalized read counts (ncRNAs)
+#####################################################################
+#Generate coverage dataframe, containing read counts at each position
+roi_ncOtherDF_cond = RNASeqUtility::splitReadCountCoveragePerCondition(coverageL = roi_ncOtherDFL, deseqds = dds, samplesInfo = samplesInfo)
+
+roi_ncOtherDF_cond_plot = roi_ncOtherDF_cond[,c("Name","condition","ReadMeansNorm","Idx")]
+roi_ncOtherDF_cond_plot = unique(roi_ncOtherDF_cond_plot)
+p2 = ggplot(data = roi_ncOtherDF_cond_plot, aes(x=Idx,y = ReadMeansNorm, color=condition)) + geom_density(stat="identity") + 
+  facet_wrap( ~Name, ncol=floor( sqrt( length( unique(roi_ncOtherDF_cond_plot$Name) ) )), scales = "free")
+ggsave(p2, filename = "otherncRNAsCoverageNorm.png")
+
 #################################################################
 #     Contig Coverage Plots
 #################################################################
@@ -58,6 +70,19 @@ contigCovDF = do.call(rbind, contigCov)
 pContig = ggplot(data = contigCovDF, aes(x=Idx,y = ReadCount, color=Sample )) + geom_density(stat="identity") + 
   facet_wrap( ~ID, ncol=floor( sqrt( length( unique(contigCovDF$ID) ) )), scales = "free")
 ggsave(pContig, filename = "contigProcessing.png")
+
+
+#####################################################################
+#     Coverage plots with mean normalized read counts (contigs)
+#####################################################################
+roi_contigCov_cond = RNASeqUtility::splitReadCountCoveragePerCondition(coverageL = contigCov, deseqds = dds, samplesInfo = samplesInfo)
+roi_contigCov_cond_plot = roi_contigCov_cond[,c("ID","condition","ReadMeansNorm","Idx")]
+roi_contigCov_cond_plot = unique(roi_contigCov_cond_plot)
+p2 = ggplot(data = roi_contigCov_cond_plot, aes(x=Idx,y = ReadMeansNorm, color=condition)) + geom_density(stat="identity") + 
+  facet_wrap( ~ID, ncol=floor( sqrt( length( unique(roi_contigCov_cond_plot$ID) ) )), scales = "free")
+ggsave(p2, filename = "contigProcessingMeanNorm.png")
+
+
 
 ###################################
 #     Contig Coverage Plots with annotation
