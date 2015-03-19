@@ -139,6 +139,33 @@ for( i in 1:length(samToolsSortncRNAmappingL)  ){
   tmpCommandLog = c(tmpCommandLog, getCommandLog(samToolsSortncRNAmappingL[[i]]) )
 }
 
+######################
+# Samtools index ncRNAs
+######################
+samToolsIndexncRNAmappingCmdResL = lapply( samToolsSortncRNAmappingL, function(x){
+  
+  inFN = getOutResultName(getOutResultReference(x))
+  currPath = getOutFilePath(getCLIApplication(x))
+  
+  ######################
+  # Samtools sort
+  ######################  
+  samIndex = Samtools_CLI(inFilePath=currPath, 
+                          inFileNames = inFN,
+                          cliParams =  c(""), 
+                          outputFlag = "", 
+                          outFilePath = currPath, 
+                          samtoolsApplication = "index", 
+                          outputFormat = "bai")
+  samIndexCmdRes = generateCommandResult( object = samIndex )
+  
+  return( samIndexCmdRes )#samViewCmdRes
+} )
+
+for( i in 1:length(samToolsIndexncRNAmappingCmdResL)  ){
+  tmpCommandLog = c(tmpCommandLog, getCommandLog(samToolsIndexncRNAmappingCmdResL[[i]]) )
+}
+
 
 ######################
 # BedGraph creation of sorted ncRNA mapping files
