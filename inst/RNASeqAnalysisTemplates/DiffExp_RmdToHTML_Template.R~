@@ -1,0 +1,10 @@
+#Need to be started in the rootDir and 
+load("Configuration.rda")
+setwd(rootDir)
+fileToKnit = list.files(getwd(), pattern=".Rmd$")
+file.copy(file.path(rootDir, fileToKnit), file.path(diffExpReportingDir, fileToKnit) )
+library(knitr)
+setwd(diffExpReportingDir)
+knit2html(input=fileToKnit,output=paste0(sub(".Rmd","",fileToKnit),"_REPORT"))
+
+

@@ -1,3 +1,35 @@
+#' @title Fetch sequences from ncRNAmapping
+#'
+#' @description This method returns a data frame containing the sequence and UID from mapped ncRNAs
+#' @param ncRNAMappingDF candidates of interest
+#' @param genomeIndexFilePath_ncRNA path to the fasta file where the STAR index is based on
+#' @return data.frame containing the UID and sequence
+#' @docType methods
+#' @export
+fetchNcRNAMappingSeq = function( ncRNAMappingDF, genomeIndexFilePath_ncRNA ){
+  require(Biostrings)
+  if( sum( !c("UID","mapStart","mapEnd") %in% colnames(ncRNAMappingDF) ) > 0 ){
+    stop("Please provide: UID, mapStart, mapEnd column in ncRNAMappingDF!")
+  }
+  ncRNASeqs= readDNAStringSet(filepath = file.path( genomeIndexFilePath_ncRNA,list.files(path=genomeIndexFilePath_ncRNA, pattern = ".fa$")))
+  names(ncRNASeqs) = sub(" .*","",  names(ncRNASeqs))
+  
+  ncRNAMappingDF$ID = sub("_minus","",ncRNAMappingDF$UID)
+  ncRNAMappingDF$ID = sub("_plus","",ncRNAMappingDF$ID)
+  
+  ncRNAMappingSeqDFL = vector("list", dim(ncRNAMappingDF)[1])
+  for( i in 1:dim(ncRNAMappingDF)[1]  ){
+    x = ncRNAMappingDF[i,]
+    currID = x$ID
+    currSeq = ncRNASeqs[which(currID == names(ncRNASeqs))]
+    
+    currSubstr = subseq(BStringSet(currSeq), start=as.integer(x$mapStart), end=ifelse( as.integer(x$mapEnd) > width(currSeq), width(currSeq), as.integer(x$mapEnd) )  )
+    ncRNAMappingSeqDFL[[i]] = data.frame("UID"=x$UID, "Sequence"=as.character(currSubstr), "Sense"=TRUE, "ID"=x$ID)
+  }
+  ncRNAMappingSeqDF = do.call(rbind, ncRNAMappingSeqDFL)
+  return(ncRNAMappingSeqDF)
+}
+
 
 #' @title Calculate Normalized Read Count Coverage
 #'

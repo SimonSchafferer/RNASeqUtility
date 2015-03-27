@@ -59,12 +59,25 @@ diffExpFormula = with(samplesInfo,~condition)
 #     The paths to the command line programs should be set HERE!
 ####################################
 #This code greps all export PATH statement from the bashrc file
-pathvars = readLines(file.path(path.expand("~"),".bashrc"))
+# pathvars = readLines(file.path(path.expand("~"),".bashrc"))
+pathvars = readLines(file.path("/etc","profile.d","compiledApps.sh"))
 pathvars = pathvars[grep("^export PATH\\=\\$PATH:",  pathvars )]
 pathvars = sub( "export PATH\\=\\$PATH:", "",pathvars)
 Sys.setenv(PATH=paste(Sys.getenv("PATH"),paste(pathvars,collapse=":"),sep=":")) 
 
 perlPath = "" #/usr/bin for example or nothing would be system default
+
+######################################
+# Check if all programs can be executed
+######################################
+listOfPrograms = c("samtools", "bedtools --version", "cutadapt --version", "STAR --version", "cmsearch -h", "perl --version", "python --version", "awk --version", "cat --version", "sort --version" )
+
+testPrograms = sapply(listOfPrograms, system)
+errorNotFound = 127
+if( sum(testPrograms) == errorNotFound ){
+  stop( paste0("Cannot find: ", paste0( sub(" .*","", names( testPrograms[testPrograms > 0]) ), collapse=", ") ) )
+}
+
 
 ######################################
 #       Options that may be changed 
@@ -139,6 +152,9 @@ dir.create(annotationDir)
 diffExpDir = file.path(rootDir,"diffExpAnalysis")
 dir.create(diffExpDir)
 
+#Differential Expression reporting directory name
+diffExpReportingDir = file.path(rootDir, "reports")
+dir.create(diffExpReportingDir)
 
 #Saving the configuration file: DO NOT CHANGE ITS NAME!
 save.image(file.path(rootDir,"Configuration.rda") )
@@ -185,7 +201,8 @@ save.image(file.path(rootDir,"Configuration.rda") )
 #   Script can be found by: file.path( system.file( package="RNASeqUtility"), "data", "PreparencRNAfasta.py")
 #   This would be an example to change a fasta containing Us to Ts and replacing whiteSpaces in Ids with _ and replacing newLines in the sequences
 #   PreparencRNAfasta.py -i testfasta.fa -o testfastaMod.fa --rmSpaceInID T --replacementChar '_' --RNAtoDNA T
-#
+#   then maybe perform a length restriction by: 
+#   FilterFastaByMaxLength.pl n fa.in > fa.out # any number n
 #   Maybe adding the ncRNA class to the header with sed: 
 #   sed -i 's/>/>snoRNA_hacabox_/g' HacaBox.fa
 #

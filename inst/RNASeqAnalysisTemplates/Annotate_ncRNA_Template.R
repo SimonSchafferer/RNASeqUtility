@@ -40,9 +40,9 @@ library(RNASeqUtility)
 switch(organismForAnnotation, 
        hg19={
          print('hg19')
-         ensembl=useMart("ensembl")
+	 ensembl=useMart("ENSEMBL_MART_ENSEMBL", host ="feb2014.archive.ensembl.org", path = "/biomart/martservice")
          ensemblMart = useDataset("hsapiens_gene_ensembl",mart=ensembl)
-         ensemblAttributes = c("ensembl_transcript_id","ensembl_gene_id","gene_biotype","external_gene_name","rfam",
+         ensemblAttributes = c("ensembl_transcript_id","ensembl_gene_id","gene_biotype","external_gene_id","rfam",
                                "chromosome_name","start_position","end_position","strand",
                                "hgnc_symbol")
          ensemblRangeBasedAnnotationDir = system.file("resources/ensembl/", package="sncRNAannotation")
@@ -74,9 +74,9 @@ switch(organismForAnnotation,
        }, 
        mm9={
          print('mm9')
-         ensembl=useMart("ensembl")
+	 ensembl=useMart("ENSEMBL_MART_ENSEMBL", host ="may2012.archive.ensembl.org", path = "/biomart/martservice")
          ensemblMart = useDataset("mmusculus_gene_ensembl",mart=ensembl)
-         ensemblAttributes=c("ensembl_transcript_id","ensembl_gene_id","gene_biotype","external_gene_name","rfam",
+         ensemblAttributes=c("ensembl_transcript_id","ensembl_gene_id","gene_biotype","external_gene_id","rfam",
                              "chromosome_name","start_position","end_position","strand",
                              "mgi_symbol")
          ensemblRangeBasedAnnotationDir = system.file("resources/ensembl/", package="sncRNAannotation")
@@ -118,6 +118,17 @@ ensTranscrNames = unique( unlist( lapply(ensReadCountL, function(x){
 ensemblAnnotDF = getBM(attributes=ensemblAttributes, filters="ensembl_transcript_id", mart=ensemblMart, 
                        values=ensTranscrNames)
 ensemblAnnotDF$chromosome_name = paste0("chr",ensemblAnnotDF$chromosome_name)
+
+#change the column external_gene_id to external_gene_name for integrity
+geneIDCol = which( colnames(ensemblAnnotDF) == "external_gene_id" )
+if( length(geneIDCol) != 0) {
+colnames(ensemblAnnotDF)[geneIDCol] = "external_gene_name"
+}
+#store the flat table including duplicated ensembl_transcript_ids in this variable
+ensemblAnnotDF_flat = ensemblAnnotDF
+#delete duplicated entries (mostly due to different external gene names or rfam identifiers -> will affect clustering but in rare cases...)
+ensemblAnnotDF = ensemblAnnotDF[which(!duplicated(ensemblAnnotDF$ensembl_transcript_id)),]
+
 #Create a reference dataframe containing all entries (Ensembl ids plus strand as ID)
 overallTable = unique(do.call( rbind, lapply( ensReadCountL, function(x){
   xdf = as.data.frame(x)
@@ -167,9 +178,11 @@ ensReadsCountDF$mapEnd = mapEnd
 ##########################
 # Clustering by RFAM ID (since RFAM is annotating ncRNA classes and not individual transcripts!)
 ##########################
-
 ensReadsCountDF$ensembl_transcript_id = sub("_.*$","",ensReadsCountDF$UID)
-ensReadsCountDF_clustered = merge( ensReadsCountDF, ensemblAnnotDF, all.x=TRUE, by="ensembl_transcript_id" )
+ensReadsCountDF = merge( ensReadsCountDF, ensemblAnnotDF, all.x=TRUE, by="ensembl_transcript_id" )
+ensReadsCountDF$rfam = ifelse(is.na(ensReadsCountDF$rfam), "", ensReadsCountDF$rfam)
+
+ensReadsCountDF_clustered = ensReadsCountDF
 ensReadsCountDF_clustered$rfam = ifelse(ensReadsCountDF_clustered$rfam == "",ensReadsCountDF_clustered$UID, ensReadsCountDF_clustered$rfam)
 ensReadsCountDF_clusteredL = split(ensReadsCountDF_clustered, ensReadsCountDF_clustered$rfam)
 ensReadsCountDF_clustered = do.call(rbind, lapply(ensReadsCountDF_clusteredL, function(x){
@@ -254,6 +267,8 @@ if( length(otherncRNAReadCountL[[1]]) != 0 ){
 write.table(ensReadsCountDF_clustered, file.path(annotationDir,"ensReadsCountDF_clustered.csv"),sep="\t",row.names=FALSE, col.names=TRUE )
 write.table(ensReadsCountDF, file.path(annotationDir,"ensReadsCountDF.csv"),sep="\t",row.names=FALSE, col.names=TRUE )
 
+rownames(ensReadsCountDF_clustered) = ensReadsCountDF_clustered$UID
+rownames(ensReadsCountDF) = ensReadsCountDF$UID
 ##########################################################################################################################
 #                               Annotation of small ncRNA contigs assembled
 ##########################################################################################################################
@@ -361,6 +376,7 @@ count_contigsGR = with(count_contigsDF, GRanges(chr, IRanges(start, end), unique
 ###############
 #   Summarize ENSEMBL Table
 ###############
+
 ensSummaryDF = with(ensReadsCountDF_clustered, data.frame("UID"=UID, "ID"=ensembl_transcript_id, 
                                                           "Name"=external_gene_name, "biotype"=gene_biotype, "strandness"=ifelse( gsub(".*_","",ensReadsCountDF_clustered$UID) == "plus", "sense","antisense" )) )
 
@@ -410,3 +426,4 @@ if( length(otherncRNAReadCountL[[1]]) != 0 ){
 write.table(minimalAnnotationDF, file.path(annotationDir,"minimalAnnotationOfAllGenes.csv"),sep="\t",row.names=FALSE, col.names=TRUE )
 
 save.image(file.path(rootDir, "Annotation.rda"))
+
