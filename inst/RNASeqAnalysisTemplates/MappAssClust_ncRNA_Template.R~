@@ -35,7 +35,7 @@ tmpCommandLog = ""
 #######################
 #   Cutadapt to trim the fastq files cutadaptOptions are defined in the configuration file
 #######################
-cutAdaptCLI = Cutadapt_CLI(inFilePath=rawDataDir, cliParams =  cutadaptOptions, outputFlag = "_trimmed", 
+cutAdaptCLI = Cutadapt_CLI(inFilePath=samplesInfo$PathToFile, inFileNames=samplesInfo$Filename, cliParams =  cutadaptOptions, outputFlag = "_trimmed", 
                            outFilePath = file.path(rootDir,"rawDataTrimmed") )
 cutAdatptCLI_cmdRes = generateCommandResult(object = cutAdaptCLI )
 #logging

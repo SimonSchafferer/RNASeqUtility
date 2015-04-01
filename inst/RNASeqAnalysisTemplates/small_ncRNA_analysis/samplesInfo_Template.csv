@@ -1,0 +1,3 @@
+"pathToFile"	"filename"	"condition"	"sampleName"
+"/path/to/raw/reads"	"testfile1.fastq"	"WT"	"WT_testfile1"
+"/path/to/raw/reads"	"testfile2.fastq"	"TG"	"TG_testfile2"

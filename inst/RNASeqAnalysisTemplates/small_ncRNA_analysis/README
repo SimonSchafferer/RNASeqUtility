@@ -1,0 +1,30 @@
+Copy All files in this directory into the directory where the analysis should be performed. 
+
+MODIFY: samplesInfo_Template.csv and Configuration_ncRNA_Template.R!
+
+This file should include at least one 'samplesInfo.csv' file and one folder (or link to folder) that is named 'rawData' including all fastq files to start with. Please see Configuration_ncRNA_Template.R
+
+The organisation of the files is as follows (in running order): 
+
+	-Configuration_ncRNA_Template.R	This file is the first file to be executed, it creates necessary folders and contains the parameters for the following scripts. 
+
+	-MappAssClust_ncRNA_Template.R This file maps assembles and clusters the reads to the genomes specified in Configuration_ncRNA_Template.R
+
+	-Annotate_ncRNA_Template.R This file annotates the mapped/assembled/clustered sequences according to annotations provided in the configuration file. 
+
+	-DiffExp_ncRNA_Template.R (optional) This gives a rough overview of differentially expressed genes with DESeq and edgeR
+
+	-DiffExp_ncRNA_Template.Rmd Generates a html report of the differentially expressed candidates by employing DESeq2. The file can be executed by calling the DiffExp_RmdToHTML_Template.R It may be also executed within R - Best practice: Copy the file DiffExp_ncRNA_Template.Rmd to (rootDir/reports) and then start R: load knitr package and generate html document with knit2html.  
+	
+	library(knitr)
+	knit2html(knit2html(input="DiffExp_ncRNA_Template.Rmd",output="DiffExp_ncRNA_Template_REPORT"))
+
+
+
+General one command Execution: 
+One may change the 'Template' term in the file names to something meaningful and accordingly has to change the executeRNASeqRScripts file. This file includes all statements needed to run the R scripts. 
+It is called e.g. in your bash with: 'bash executeRNASeqRScripts > executeRNASeqRScripts.out'
+
+
+
+
