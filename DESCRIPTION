@@ -8,6 +8,17 @@ Maintainer: Who to complain to <simon.schafferer@i-med.ac.at>
 Description: This package contains helper Methods for RNA-Seq analysis and
     provides templates in RNASeqAnalysisTemplates folder
 License: MIT
+SystemRequirements:
+    samtools,
+    bedtools,
+    cutadapt,
+    STAR,
+    cmsearch,
+    perl,
+    python,
+    awk,
+    cat,
+    sort
 Depends:
     CLIHelperPackage,
     sncRNAannotation,
