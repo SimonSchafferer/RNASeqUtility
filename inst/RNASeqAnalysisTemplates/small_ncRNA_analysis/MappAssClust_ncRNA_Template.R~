@@ -560,12 +560,13 @@ cmdExecTime
 ncRNAreadCountDF = tryCatch({  
   ncRNAreadCountDF = generateCountFromMappingDF(bamToBedAndMergencRNAL, samplesInfo=samplesInfo)  
   write.table( ncRNAreadCountDF, file.path(readCountsDir, "ncRNAreadCountDF.csv"), sep="\t", col.names=TRUE, row.names=TRUE )
+  return(ncRNAreadCountDF)
 }, warning = function(w) {
-  message(w)
+  message("Could not create count table - skipping")
 }, error = function(e) {
-  message(e)
+  message("Could not create count table - skipping")
 }, finally = {
-  ncRNAreadCountDF = NULL
+  #message("Could not create count table - skipping")
 })
 
 ########################################################################################################################################################
