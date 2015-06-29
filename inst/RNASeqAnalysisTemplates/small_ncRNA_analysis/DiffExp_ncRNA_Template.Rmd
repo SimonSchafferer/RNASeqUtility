@@ -29,7 +29,7 @@ library(rCharts)
 
 ```{r preparation, echo=FALSE}
 #This following analysis is based on: http://www.bioconductor.org/help/workflows/rnaseqGene/
-load("Annotation.rda")
+load("../Annotation.rda")
 setwd(rootDir)
 args <- commandArgs(TRUE)
 if( length(args) == 0 ){

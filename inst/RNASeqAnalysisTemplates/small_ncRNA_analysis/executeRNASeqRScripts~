@@ -1,8 +1,8 @@
 #script names have to be changed, below are the scripts in the correct running order
 
-R CMD BATCH --no-save --no-restore Configuration_ncRNA_AD20150626.R
-R CMD BATCH --no-save --no-restore MappAssClust_ncRNA_AD20150626.R
-R CMD BATCH --no-save --no-restore Annotate_ncRNA_AD20150626.R
+R CMD BATCH --no-save --no-restore Configuration_ncRNA_Template.R
+R CMD BATCH --no-save --no-restore MappAssClust_ncRNA_Template.R
+R CMD BATCH --no-save --no-restore Annotate_ncRNA_Template.R
 R CMD BATCH --no-save --no-restore DiffExp_RmdToHTML_Template.R
 
 #If the files are not in the base directory containing sampleInfo.csv and rawData then please provide the path

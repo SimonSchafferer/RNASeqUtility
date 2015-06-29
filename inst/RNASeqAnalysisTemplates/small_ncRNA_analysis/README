@@ -12,8 +12,6 @@ The organisation of the files is as follows (in running order):
 
 	-Annotate_ncRNA_Template.R This file annotates the mapped/assembled/clustered sequences according to annotations provided in the configuration file. 
 
-	-DiffExp_ncRNA_Template.R (optional) This gives a rough overview of differentially expressed genes with DESeq and edgeR
-
 	-DiffExp_ncRNA_Template.Rmd Generates a html report of the differentially expressed candidates by employing DESeq2. The file can be executed by calling the DiffExp_RmdToHTML_Template.R It may be also executed within R - Best practice: Copy the file DiffExp_ncRNA_Template.Rmd to (rootDir/reports) and then start R: load knitr package and generate html document with knit2html.  
 	
 	library(knitr)

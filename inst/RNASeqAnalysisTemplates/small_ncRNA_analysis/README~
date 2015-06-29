@@ -1,5 +1,7 @@
 Copy All files in this directory into the directory where the analysis should be performed. 
 
+MODIFY: samplesInfo_Template.csv and Configuration_ncRNA_Template.R!
+
 This file should include at least one 'samplesInfo.csv' file and one folder (or link to folder) that is named 'rawData' including all fastq files to start with. Please see Configuration_ncRNA_Template.R
 
 The organisation of the files is as follows (in running order): 
