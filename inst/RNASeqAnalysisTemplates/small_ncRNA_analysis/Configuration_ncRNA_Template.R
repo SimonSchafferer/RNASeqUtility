@@ -148,11 +148,11 @@ annotationDir = file.path(rootDir,"annotation")
 dir.create(annotationDir)
 
 #Differential Expression result directory name
-diffExpDir = file.path(rootDir,"diffExpAnalysis")
-dir.create(diffExpDir)
+# diffExpDir = file.path(rootDir,"diffExpAnalysis")
+# dir.create(diffExpDir)
 
 #Differential Expression reporting directory name
-diffExpReportingDir = file.path(rootDir, "reports")
+diffExpReportingDir = file.path(rootDir, "de_analysis_report")
 dir.create(diffExpReportingDir)
 
 #Saving the configuration file: DO NOT CHANGE ITS NAME!
