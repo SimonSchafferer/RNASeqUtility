@@ -380,8 +380,14 @@ count_contigsGR = with(count_contigsDF, GRanges(chr, IRanges(start, end), unique
 ensSummaryDF = with(ensReadsCountDF_clustered, data.frame("UID"=UID, "ID"=ensembl_transcript_id, 
                                                           "Name"=external_gene_name, "biotype"=gene_biotype, "strandness"=ifelse( gsub(".*_","",ensReadsCountDF_clustered$UID) == "plus", "sense","antisense" )) )
 
-biotypeOther = rep("miRNA",length(otherReadsCountDF$UID))
+#In the next lines the biotype will be extracted from the fasta file provided, based on identifier -> these may be changed
+biotypeOther = rep("other",length(otherReadsCountDF$UID))
 biotypeOther[grep("snoRNA", otherReadsCountDF$UID )] = "snoRNA"
+biotypeOther[grep("MIMAT[0-9]{7}", otherReadsCountDF$UID )] = "miRNA"
+biotypeOther[grep("MI[0-9]{7}", otherReadsCountDF$UID )] = "miRNA"
+biotypeOther[grep("miR-", otherReadsCountDF$UID)] = "miRNA"
+biotypeOther[grep("tdbD[0-9]{8}", otherReadsCountDF$UID)] = "tRNA"
+
 otherName = ifelse( biotypeOther == "miRNA", sub( "_.*","", otherReadsCountDF$UID), gsub(".*_","", sub("_minus","",sub("_plus","",otherReadsCountDF$UID) )) )
 otherID = ifelse( biotypeOther == "miRNA", sub("_.*$","",gsub(".*_MI","MI",otherReadsCountDF$UID))  , otherName )
 
