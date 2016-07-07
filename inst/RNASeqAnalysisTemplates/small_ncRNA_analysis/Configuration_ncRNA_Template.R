@@ -69,7 +69,7 @@ perlPath = "" #/usr/bin for example or nothing would be system default
 ######################################
 # Check if all programs can be executed
 ######################################
-listOfPrograms = c("samtools", "bedtools --version", "cutadapt --version", "STAR --version", "cmsearch -h", "perl --version", "python --version", "awk --version", "cat --version", "sort --version" )
+listOfPrograms = c("samtools --version", "bedtools --version", "cutadapt --version", "STAR --version", "cmsearch -h", "perl --version", "python --version", "awk --version", "cat --version", "sort --version", "blastn -version" )
 
 testPrograms = sapply(listOfPrograms, system)
 errorNotFound = 127

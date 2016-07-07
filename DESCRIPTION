@@ -19,7 +19,7 @@ SystemRequirements:
     awk,
     cat,
     sort
-Depends:
+Imports:
     CLIHelperPackage,
     sncRNAannotation,
     ggplot2, 
