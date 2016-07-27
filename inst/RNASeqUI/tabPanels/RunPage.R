@@ -11,6 +11,7 @@ fluidPage(
   mainPanel(
     tableOutput('upl_samplesInfo'),
     hr(),
-    actionButton("runAnalysisBtn", "Run Analysis!")
+    actionButton("runAnalysisBtn", "Run Analysis!"),
+    plotOutput("plotError")
     )
 )

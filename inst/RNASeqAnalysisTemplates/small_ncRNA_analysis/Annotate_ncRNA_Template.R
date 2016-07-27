@@ -40,9 +40,9 @@ library(RNASeqUtility)
 switch(organismForAnnotation, 
        hg19={
          print('hg19')
-	 ensembl=useMart("ENSEMBL_MART_ENSEMBL", host ="feb2014.archive.ensembl.org", path = "/biomart/martservice")
+         ensembl=useMart("ensembl")
          ensemblMart = useDataset("hsapiens_gene_ensembl",mart=ensembl)
-         ensemblAttributes = c("ensembl_transcript_id","ensembl_gene_id","gene_biotype","external_gene_id","rfam",
+         ensemblAttributes = c("ensembl_transcript_id","ensembl_gene_id","gene_biotype","external_gene_name","rfam",
                                "chromosome_name","start_position","end_position","strand",
                                "hgnc_symbol")
          ensemblRangeBasedAnnotationDir = system.file("resources/ensembl/", package="sncRNAannotation")
@@ -74,9 +74,9 @@ switch(organismForAnnotation,
        }, 
        mm9={
          print('mm9')
-	 ensembl=useMart("ENSEMBL_MART_ENSEMBL", host ="may2012.archive.ensembl.org", path = "/biomart/martservice")
+         ensembl=useMart("ensembl")
          ensemblMart = useDataset("mmusculus_gene_ensembl",mart=ensembl)
-         ensemblAttributes=c("ensembl_transcript_id","ensembl_gene_id","gene_biotype","external_gene_id","rfam",
+         ensemblAttributes=c("ensembl_transcript_id","ensembl_gene_id","gene_biotype","external_gene_name","rfam",
                              "chromosome_name","start_position","end_position","strand",
                              "mgi_symbol")
          ensemblRangeBasedAnnotationDir = system.file("resources/ensembl/", package="sncRNAannotation")
@@ -118,17 +118,6 @@ ensTranscrNames = unique( unlist( lapply(ensReadCountL, function(x){
 ensemblAnnotDF = getBM(attributes=ensemblAttributes, filters="ensembl_transcript_id", mart=ensemblMart, 
                        values=ensTranscrNames)
 ensemblAnnotDF$chromosome_name = paste0("chr",ensemblAnnotDF$chromosome_name)
-
-#change the column external_gene_id to external_gene_name for integrity
-geneIDCol = which( colnames(ensemblAnnotDF) == "external_gene_id" )
-if( length(geneIDCol) != 0) {
-colnames(ensemblAnnotDF)[geneIDCol] = "external_gene_name"
-}
-#store the flat table including duplicated ensembl_transcript_ids in this variable
-ensemblAnnotDF_flat = ensemblAnnotDF
-#delete duplicated entries (mostly due to different external gene names or rfam identifiers -> will affect clustering but in rare cases...)
-ensemblAnnotDF = ensemblAnnotDF[which(!duplicated(ensemblAnnotDF$ensembl_transcript_id)),]
-
 #Create a reference dataframe containing all entries (Ensembl ids plus strand as ID)
 overallTable = unique(do.call( rbind, lapply( ensReadCountL, function(x){
   xdf = as.data.frame(x)
@@ -178,11 +167,9 @@ ensReadsCountDF$mapEnd = mapEnd
 ##########################
 # Clustering by RFAM ID (since RFAM is annotating ncRNA classes and not individual transcripts!)
 ##########################
-ensReadsCountDF$ensembl_transcript_id = sub("_.*$","",ensReadsCountDF$UID)
-ensReadsCountDF = merge( ensReadsCountDF, ensemblAnnotDF, all.x=TRUE, by="ensembl_transcript_id" )
-ensReadsCountDF$rfam = ifelse(is.na(ensReadsCountDF$rfam), "", ensReadsCountDF$rfam)
 
-ensReadsCountDF_clustered = ensReadsCountDF
+ensReadsCountDF$ensembl_transcript_id = sub("_.*$","",ensReadsCountDF$UID)
+ensReadsCountDF_clustered = merge( ensReadsCountDF, ensemblAnnotDF, all.x=TRUE, by="ensembl_transcript_id" )
 ensReadsCountDF_clustered$rfam = ifelse(ensReadsCountDF_clustered$rfam == "",ensReadsCountDF_clustered$UID, ensReadsCountDF_clustered$rfam)
 ensReadsCountDF_clusteredL = split(ensReadsCountDF_clustered, ensReadsCountDF_clustered$rfam)
 ensReadsCountDF_clustered = do.call(rbind, lapply(ensReadsCountDF_clusteredL, function(x){
@@ -267,8 +254,6 @@ if( length(otherncRNAReadCountL[[1]]) != 0 ){
 write.table(ensReadsCountDF_clustered, file.path(annotationDir,"ensReadsCountDF_clustered.csv"),sep="\t",row.names=FALSE, col.names=TRUE )
 write.table(ensReadsCountDF, file.path(annotationDir,"ensReadsCountDF.csv"),sep="\t",row.names=FALSE, col.names=TRUE )
 
-rownames(ensReadsCountDF_clustered) = ensReadsCountDF_clustered$UID
-rownames(ensReadsCountDF) = ensReadsCountDF$UID
 ##########################################################################################################################
 #                               Annotation of small ncRNA contigs assembled
 ##########################################################################################################################
@@ -351,12 +336,6 @@ colnames(bestMatch) = paste0("inf_",colnames(bestMatch))
 #Merge the infernal annotations with the range based annotations
 contigAnnotTable_fin = merge( contigAnnotTable, bestMatch, by.x="contigID", by.y="inf_queryName", all.x=TRUE)
 
-#Adding the reads to the annotation table
-contigsCountDF = read.table( file.path( getOutFilePath(getCLIApplication(multiBamCov_CLI_cmdRes)),getOutResultName(getOutResultReference(multiBamCov_CLI_cmdRes)) ), 
-                             sep="\t", header=FALSE, stringsAsFactors = FALSE)
-colnames(contigsCountDF) = c("chr","chrStart","chrEnd","contigID","Uniqueness","strand",1:(dim(contigsCountDF)[2]-6) )
-contigAnnotTable_fin = merge(contigAnnotTable_fin, contigsCountDF, by="contigID")
-
 #Writing the contig annotation table
 write.table(contigAnnotTable_fin, file.path(annotationDir,"contigAnnotTable_fin.csv"),sep="\t",row.names=FALSE, col.names=TRUE )
 
@@ -364,72 +343,23 @@ write.table(contigAnnotTable_fin, file.path(annotationDir,"contigAnnotTable_fin.
 # load Coverage Matrix
 ############################
 count_contigsDF = read.table( file=file.path( getOutFilePath(getCLIApplication(multiBamCov_CLI_cmdRes)), getOutResultName(getOutResultReference(multiBamCov_CLI_cmdRes))), 
-                              sep="\t", header=FALSE, stringsAsFactors = FALSE )
+                              sep="\t", header=FALSE )
 colnames(count_contigsDF) = c("chr","start","end","contigID","uniqueness","strand",samplesInfo$sampleName)
 count_contigsGR = with(count_contigsDF, GRanges(chr, IRanges(start, end), uniqueness=uniqueness, strand=strand,contigID=contigID,
                                                 count_contigsDF[,7:dim(count_contigsDF)[2]]))
 
-############################
-#Summarized Annotation for plotting - Minimal Annotation for each gene!
-############################
-
-###############
-#   Summarize ENSEMBL Table
-###############
-
-ensSummaryDF = with(ensReadsCountDF_clustered, data.frame("UID"=UID, "ID"=ensembl_transcript_id, 
-                                                          "Name"=external_gene_name, "biotype"=gene_biotype, "strandness"=ifelse( gsub(".*_","",ensReadsCountDF_clustered$UID) == "plus", "sense","antisense" )) )
-
-#In the next lines the biotype will be extracted from the fasta file provided, based on identifier -> these may be changed
-biotypeOther = rep("other",length(otherReadsCountDF$UID))
-biotypeOther[grep("snoRNA", otherReadsCountDF$UID )] = "snoRNA"
-biotypeOther[grep("MIMAT[0-9]{7}", otherReadsCountDF$UID )] = "miRNA"
-biotypeOther[grep("MI[0-9]{7}", otherReadsCountDF$UID )] = "miRNA"
-biotypeOther[grep("miR-", otherReadsCountDF$UID)] = "miRNA"
-biotypeOther[grep("tdbD[0-9]{8}", otherReadsCountDF$UID)] = "tRNA"
-
-otherName = ifelse( biotypeOther == "miRNA", sub( "_.*","", otherReadsCountDF$UID), gsub(".*_","", sub("_minus","",sub("_plus","",otherReadsCountDF$UID) )) )
-otherID = ifelse( biotypeOther == "miRNA", sub("_.*$","",gsub(".*_MI","MI",otherReadsCountDF$UID))  , otherName )
-
-###############
-#   Summarize other Table
-###############
-if( length(otherncRNAReadCountL[[1]]) != 0 ){
-  otherAnnotSummaryDF = with(otherReadsCountDF, data.frame("UID"=otherReadsCountDF$UID,
-                                                           "ID"=otherID,
-                                                           "Name"=otherName,
-                                                           "biotype"=biotypeOther,
-                                                           "strandness"=ifelse( gsub(".*_","",UID) == "plus", "sense","antisense")
-  ))
-}
-
-###############
-#   contigAnnotTable
-###############
-contigAnnotTable_fin_summary = summarizeContigAnnotation(contigDF = contigAnnotTable_fin)
-contigAnnotTable_fin = contigAnnotTable_fin[order(contigAnnotTable_fin$contigID),]
-contigAnnotTable_fin_summary = contigAnnotTable_fin_summary[order(contigAnnotTable_fin_summary$contigID),]
-
-strandnessAnnot = ifelse( contigAnnotTable_fin_summary$annotationType == "featureAnnot", contigAnnotTable_fin$f_feature_strand, 
-                          ifelse( contigAnnotTable_fin_summary$annotationType == "repeatMaskr", contigAnnotTable_fin$r_featureStrand, 
-                                  ifelse( contigAnnotTable_fin_summary$annotationType == "unknown", "+", contigAnnotTable_fin$inf_strand ) 
-                          )
-)
-contigAnnotSummaryDF = with( contigAnnotTable_fin_summary, data.frame(
-  "UID"=contigID,
-  "ID"=contigID,
-  "Name"=featureAnnotName,
-  "biotype"=featureAnnotType,
-  "strandness"=ifelse( contigAnnotTable_fin$strand == strandnessAnnot, "sense", "antisense")
-) )
-
-#Combine All Tables
-minimalAnnotationDF = rbind(ensSummaryDF, contigAnnotSummaryDF)
-if( length(otherncRNAReadCountL[[1]]) != 0 ){
-  minimalAnnotationDF = rbind(minimalAnnotationDF,  otherAnnotSummaryDF)  
-}
-
-write.table(minimalAnnotationDF, file.path(annotationDir,"minimalAnnotationOfAllGenes.csv"),sep="\t",row.names=FALSE, col.names=TRUE )
-
 save.image(file.path(rootDir, "Annotation.rda"))
+
+
+#Testing
+# ensReadsCountDF_clusteredGR = with( ensReadsCountDF_clustered, GRanges( seqnames=chromosome_name, 
+#                                                                         IRanges((start_position+mapStart-1),
+#                                                                                 (start_position+mapEnd-1)), strand=strand,
+#                                                                         ensembl_transcript_id, UID, ensembl_gene_id, 
+#                                                                         gene_biotype,external_gene_name,rfam,hgnc_symbol,clustered ))
+# findOverlaps(ensReadsCountDF_clusteredGR, contigForCountingGR_clustered)
+# ensReadsCountDF_clusteredGR[591]
+# contigForCountingGR_clustered[27]
+# contigAnnotTable_fin[contigAnnotTable_fin$contigID == "contig27",]
+# count_contigsGR[count_contigsGR$contigID %in% contigAnnotTable_fin[which(contigAnnotTable_fin$inf_targetName == "tmRNA"),]$contigID]
 

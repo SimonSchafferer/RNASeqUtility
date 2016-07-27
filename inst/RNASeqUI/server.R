@@ -20,7 +20,7 @@ shinyServer(function(input, output, session) {
   clusteringSrcFN = "4_AssemblyClustering.R"
   annotationSrcFN = "5_Annotation.R"
   diffExpSrcFN = "6_DiffExp.R"
-  
+  diffExpRepFN = "DiffExp_ncRNA_Template.Rmd"
   ######################
   #   Samples Info Upload
   ######################
@@ -105,38 +105,48 @@ shinyServer(function(input, output, session) {
   }
   
   
-  callValidate = reactive({
-    #Installed Programs
-#     listOfPrograms = c("samtools --version", "bedtools --version", "cutadapt --version", "STAR --version", "cmsearch -h", "perl --version", "python --version", "awk --version", "cat --version", "sort --version", "blastn -version" )
-#     programsNotFound = c("")
-#     testPrograms = sapply(listOfPrograms, system)
-    #Check Sample Info.txt
-#     requiredCols = c("condition","sampleName","pathToFile","filename" )
-#     
-#     validate(
-#       need(dir.exists(input$config_genomeIndexFilePath),"Please specify a valid genome index path directory.")
-#     )
-#     validate(
-#       need(dir.exists(input$config_genomeIndexFilePath_ncRNA),"Please specify a valid ncRNA genome index path directory.")
-#     )
-#     validate(
-#       need(dir.exists(input$config_repeatMaskerDir),"Please specify a valid repeat masker index path directory.")
-#     )
-#     validate(
-#       need( sum(testPrograms) == 0, paste0("Cannot find: ", paste0( sub(" .*","", names( testPrograms[testPrograms > 0]) ), collapse=", ") ))
-#     )
-#     validate(
-#       need(sum( requiredCols %in% colnames(samplesInfo())) == length(requiredCols),"Please provide a sampleInfo file with column: 'condition', 'sampleName', 'pathToFile' and 'filename' ")
-#     )
+  callValidate = function(){
+    
+    # Installed Programs
+    listOfPrograms = c("samtools --version", "bedtools --version", "cutadapt --version", "STAR --version", "cmsearch -h", "perl --version", "python --version", "awk --version", "cat --version", "sort --version", "blastn -version" )
+    programsNotFound = c("")
+    testPrograms = sapply(listOfPrograms, system)
+    validate(
+      need( sum(testPrograms) == 0, paste0("Cannot find: ", paste0( sub(" .*","", names( testPrograms[testPrograms > 0]) ), collapse=", ") ))
+    )
+    
+    # Check Sample Info.txt
+    requiredCols = c("condition","sampleName","pathToFile","filename" )
+    
+    validate(
+      need(dir.exists(input$config_genomeIndexFilePath),"Please specify a valid genome index path directory.")
+    )
+    validate(
+      need(dir.exists(input$config_genomeIndexFilePath_ncRNA),"Please specify a valid ncRNA genome index path directory.")
+    )
+    validate(
+      need(dir.exists(input$config_repeatMaskerDir),"Please specify a valid repeat masker index path directory.")
+    )
+
+    validate(
+      need(sum( requiredCols %in% colnames(samplesInfo())) == length(requiredCols),"Please provide a sampleInfo file with column: 'condition', 'sampleName', 'pathToFile' and 'filename' ")
+    )
     
     # print("All Ok!")
     
+  }
+  
+  output$plotError <- renderPlot({
+    callValidate()
+    return(NULL)
   })
+  
   
   observeEvent(input$runAnalysisBtn, {
     req(samplesInfo())
     write.table(samplesInfo(),file = file.path(input$config_rootDir, "SamplesInfo.txt"), sep=",",col.names = TRUE, row.names=FALSE)
     writeConfigFile()
+    callValidate()
     runMapping()
     })
   
@@ -146,40 +156,43 @@ shinyServer(function(input, output, session) {
     #############################
     withProgress( message = '',min = 0, max = 1, value=0,{
       
-      input$config_cutadaptRun
+      
       
       setwd(input$config_rootDir)
       source(file.path(input$config_rootDir, "Configuration_ncRNA.R"), local = TRUE)$value
       #Cutadapt
-      incProgress(amount = 0.2, detail = paste("Assembling document"))
+      incProgress(amount = 0.2, detail = paste("Trimming Reads"))
       file.copy(from=file.path(pipelineDir,cutadaptSourceFN), to=input$config_rootDir)
       source(file.path(pipelineDir, cutadaptSourceFN), local = TRUE)$value
       
       #Mapping ncRNA
-      incProgress(amount = 0.2, detail = paste("Assembling document"))
+      incProgress(amount = 0.2, detail = paste("Mapping to ncRNA genome"))
       file.copy(from=file.path(pipelineDir,ncRNAMappingSrcFN), to=input$config_rootDir)
       source(file.path(pipelineDir, ncRNAMappingSrcFN), local = TRUE)$value
       
       #MappingGenome
-      incProgress(amount = 0.2, detail = paste("Assembling document"))
+      incProgress(amount = 0.2, detail = paste("Mapping to whole genome"))
       file.copy(from=file.path(pipelineDir,genomeMappingSrcFN), to=input$config_rootDir)
       source(file.path(pipelineDir, genomeMappingSrcFN), local = TRUE)$value
       
       #Assembly Clustering
-      incProgress(amount = 0.2, detail = paste("Assembling document"))
+      incProgress(amount = 0.2, detail = paste("Assembly and Clustering"))
       file.copy(from=file.path(pipelineDir,clusteringSrcFN), to=input$config_rootDir)
       source(file.path(pipelineDir, clusteringSrcFN), local = TRUE)$value
       
-      #Annotation
-      incProgress(amount = 0.2, detail = paste("Assembling document"))
-      file.copy(from=file.path(pipelineDir,annotationSrcFN), to=input$config_rootDir)
-      source(file.path(pipelineDir, annotationSrcFN), local = TRUE)$value
-      
-      #DiffExp
-      incProgress(amount = 0.2, detail = paste("Assembling document"))
-      file.copy(from=file.path(pipelineDir,diffExpSrcFN), to=input$config_rootDir)
-      source(file.path(pipelineDir, diffExpSrcFN), local = TRUE)$value
-      
+      if( input$chooseRunScripts %in% c(2,3)){
+        #Annotation
+        incProgress(amount = 0.2, detail = paste("Annotation"))
+        file.copy(from=file.path(pipelineDir,annotationSrcFN), to=input$config_rootDir)
+        source(file.path(pipelineDir, annotationSrcFN), local = TRUE)$value
+      }
+
+      if( input$chooseRunScripts == 3){
+        #DiffExp
+        incProgress(amount = 0.2, detail = paste("Differential Expression Analysis"))
+        file.copy(from=file.path(pipelineDir,diffExpSrcFN), to=input$config_rootDir)
+        source(file.path(pipelineDir, diffExpSrcFN), local = TRUE)$value
+      }
     })
     
   }

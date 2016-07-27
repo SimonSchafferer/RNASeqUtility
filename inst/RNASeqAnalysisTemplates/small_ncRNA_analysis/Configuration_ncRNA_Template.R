@@ -9,24 +9,26 @@
 ######################################################
 
 #Base directory of the analysis
-rootDir = file.path( "/tmp","test","","","","","")#schaffrr
+rootDir = file.path( "/home/schaffrr/RNASeqUtilityTestFiles/MiniAnalysis_rnastarShort_extended")#schaffrr
+#Directory containging fastq files
+rawDataDir = file.path(rootDir,"rawData")
 
 #Path to rna star mapper Index file for whole genome (download genome fasta file from UCSC -> twoBit format -> convert with twoBitToFa )
-genomeIndexFilePath = "/home/simon/dbsOfflineUse/HomoSapiens/hg19/rnaStarIndex"
+genomeIndexFilePath = "/media/schaffrr/SimonsDrive1TB/backup/simon/dbsOfflineUse/HomoSapiens/hg19/rnaStarIndex"
 
 #Path to rna star mapper Index file for ncRNAs -> Please use RNASeqUtility::createSizeSelectedEnsemblncRNADB method! *see Prepare ncRNAIndex below
-genomeIndexFilePath_ncRNA = "/home/simon/dbsOfflineUse/HomoSapiens/hg19/ncRNA_ENSEMBL/restr400nt_extended"#please uncomment above if a db dir has to be created
+genomeIndexFilePath_ncRNA = "/media/schaffrr/SimonsDrive1TB/backup/simon/dbsOfflineUse/HomoSapiens/hg19/ncRNA_ENSEMBL/restr400nt_extended"#please uncomment above if a db dir has to be created
 
 ##############
 #     For the annotation Script
 ##############
 #Path to infernal database (compiled)
-infernalDB = file.path("/home","simon","dbsOfflineUse","HomoSapiens","hg19","infernal","Rfam.cm.1_1")
+infernalDB = file.path("/media/schaffrr/SimonsDrive1TB/backup","simon","dbsOfflineUse","HomoSapiens","hg19","infernal","Rfam.cm.1_1")
 
 #Path to repeat masker file (Please see below for further information)
-repeatMaskerDir = "/home/simon/dbsOfflineUse/HomoSapiens/hg19/repeatMskr"
+repeatMaskerDir = "/media/schaffrr/SimonsDrive1TB/backup/simon/dbsOfflineUse/HomoSapiens/hg19/repeatMskr"
 #Name of the repeat masker file (either .rda (see sncRNAannotation package) or bed file!)
-repeatMaskerFN = "rpmsk_hg19.rda" #or GRanges object
+repeatMaskerFN = "rmsk_hg19.bed" #or GRanges object
 
 #Assembly of Annotation:
 organismForAnnotation = "hg19" #
@@ -44,38 +46,15 @@ readCompositionIdentity = 0.95 #This is used for clustering: If 0.95: At least 9
 # so in this case if there are 5% reads that are different then the contig will be kept next to the representative contig. When this value is set to 1 then contigs will be clustered to the 
 # representative contig if they share the same reads. If this is set to 0, then a contig will be deleted if it shares 1 or more reads with an representative contig!
 
-#Differential Expression analysis parameters
-#Name and Path of the tab separated file containing the sample information
-samplesInfo = read.table(file=file.path(rootDir, "samplesInfo.csv"), sep="\t", header=TRUE, stringsAsFactors = FALSE) #should contain cloumn condition and column sample name
-requiredCols = c("condition","sampleName","pathToFile","filename" )
-if(sum( requiredCols %in% colnames(samplesInfo)) != length(requiredCols) ) {stop("Please provide a sampleInfo file with column: 'condition', 'sampleName', 'pathToFile' and 'filename' ")}
-
-#HERE THE LINEAR MODEL FOR DIFFERENTIAL EXPRESSION MAY BE DEFINED
-diffExpFormula = with(samplesInfo,~condition)
-                        
 
 ####################################
 #     The paths to the command line programs should be set HERE!
 ####################################
 #This code greps all export PATH statement from the bashrc file
-#pathvars = readLines(file.path(path.expand("~"),".bashrc"))
-#pathvars = readLines(file.path("/etc","profile.d","compiledApps.sh"))
-#pathvars = pathvars[grep("^export PATH\\=\\$PATH:",  pathvars )]
-#pathvars = sub( "export PATH\\=\\$PATH:", "",pathvars)
-#Sys.setenv(PATH=paste(Sys.getenv("PATH"),paste(pathvars,collapse=":"),sep=":")) 
-
-perlPath = "" #/usr/bin for example or nothing would be system default
-
-######################################
-# Check if all programs can be executed
-######################################
-listOfPrograms = c("samtools --version", "bedtools --version", "cutadapt --version", "STAR --version", "cmsearch -h", "perl --version", "python --version", "awk --version", "cat --version", "sort --version", "blastn -version" )
-
-testPrograms = sapply(listOfPrograms, system)
-errorNotFound = 127
-if( sum(testPrograms) == errorNotFound ){
-  stop( paste0("Cannot find: ", paste0( sub(" .*","", names( testPrograms[testPrograms > 0]) ), collapse=", ") ) )
-}
+pathvars = readLines(file.path(path.expand("~"),".bashrc"))
+pathvars = pathvars[grep("export PATH\\=\\$PATH:",  pathvars )]
+pathvars = sub( "export PATH\\=\\$PATH:", "",pathvars)
+Sys.setenv(PATH=paste(Sys.getenv("PATH"),paste(pathvars,collapse=":"),sep=":")) 
 
 
 ######################################
@@ -85,7 +64,7 @@ if( sum(testPrograms) == errorNotFound ){
 ########################
 # Cutadapt Params ncRNA
 ########################
-cutadaptOptions = "-a ATCACCGACTGCCCATAGAGAGG --minimum-length 16"
+cutadaptOptions = "-a ATCACCGACTGCCCATAGAGAGGCTGAGAC --minimum-length 18"
 
 ########################
 # RNAStar Params ncRNA
@@ -148,12 +127,14 @@ annotationDir = file.path(rootDir,"annotation")
 dir.create(annotationDir)
 
 #Differential Expression result directory name
-# diffExpDir = file.path(rootDir,"diffExpAnalysis")
-# dir.create(diffExpDir)
+diffExpDir = file.path(rootDir,"diffExpAnalysis")
+dir.create(diffExpDir)
 
-#Differential Expression reporting directory name
-diffExpReportingDir = file.path(rootDir, "de_analysis_report")
-dir.create(diffExpReportingDir)
+#Name and Path of the tab separated file containing the sample information
+samplesInfo = read.table(file=file.path(rootDir, "samplesInfo.csv"), sep="\t", header=TRUE) #should contain cloumn condition and column sample name
+if(!( "sampleName" %in% colnames(samplesInfo) & "condition"%in% colnames(samplesInfo))) {stop("Please provide a sampleInfo file with column condition and column sampleName")}
+
+diffExpFormula = with(samplesInfo,~condition)
 
 #Saving the configuration file: DO NOT CHANGE ITS NAME!
 save.image(file.path(rootDir,"Configuration.rda") )
@@ -200,8 +181,7 @@ save.image(file.path(rootDir,"Configuration.rda") )
 #   Script can be found by: file.path( system.file( package="RNASeqUtility"), "data", "PreparencRNAfasta.py")
 #   This would be an example to change a fasta containing Us to Ts and replacing whiteSpaces in Ids with _ and replacing newLines in the sequences
 #   PreparencRNAfasta.py -i testfasta.fa -o testfastaMod.fa --rmSpaceInID T --replacementChar '_' --RNAtoDNA T
-#   then maybe perform a length restriction by: 
-#   FilterFastaByMaxLength.pl n fa.in > fa.out # any number n
+#
 #   Maybe adding the ncRNA class to the header with sed: 
 #   sed -i 's/>/>snoRNA_hacabox_/g' HacaBox.fa
 #

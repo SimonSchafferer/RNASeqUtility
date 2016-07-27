@@ -35,12 +35,14 @@ tmpCommandLog = ""
 #######################
 #   Cutadapt to trim the fastq files cutadaptOptions are defined in the configuration file
 #######################
-cutAdaptCLI = Cutadapt_CLI(inFilePath=samplesInfo$pathToFile, inFileNames=samplesInfo$filename, cliParams =  cutadaptOptions, outputFlag = "_trimmed", 
+cutAdaptCLI = Cutadapt_CLI(inFilePath=rawDataDir, cliParams =  cutadaptOptions, outputFlag = "_trimmed", 
                            outFilePath = file.path(rootDir,"rawDataTrimmed") )
 cutAdatptCLI_cmdRes = generateCommandResult(object = cutAdaptCLI )
 #logging
 tmpCommandLog = getCommandLog(cutAdatptCLI_cmdRes)
 
+#Execute Cutadapt
+cutAdatptCLI_execRes = executeCommandResult(cutAdatptCLI_cmdRes, testing=FALSE)
 
 #############################################################
 #     Mapping ncRNAs to the ENSEMBL ncRNA fasta file
@@ -75,6 +77,11 @@ names(mappingncRNACLI_cmdResL) = fastQFiles
 for( i in 1:length(mappingncRNACLI_cmdResL)  ){
   tmpCommandLog = c(tmpCommandLog, getCommandLog(mappingncRNACLI_cmdResL[[i]]) )
 }
+#Execution
+mappingncRNACLI_execResL = lapply( mappingncRNACLI_cmdResL, function(x){
+  executeCommandResult(mappingncRNACLI_cmdResL[[i]],  testing=FALSE)
+})
+
 
 #############################################################
 #     Read counting by bamToBed and mergeBed
@@ -96,7 +103,7 @@ bamToBedAndMergencRNAL = lapply( mappingncRNACLI_cmdResL, function(x){
   
   mergeBedFile_CLI_cmdRes = generateCommandResult(MergeBedFile_CLI(inFilePath = getOutFilePath(getCLIApplication(currCmdGenResult)), 
                                                                    inFileNames = getOutResultName(getOutResultReference(bamToBed_CLI_cmdRes)), 
-                                                                   cliParams = paste0("-s -d ",readOverlap_contig," -c 4,5,6 -o count,mean,distinct"), 
+                                                                   cliParams = paste0("-s -d ",readOverlap_contig," -c 4,5,6 -o count,mean,distinct  | sed -r 's/(\\s+)?\\S+//4'"), 
                                                                    outputFlag = "_counted", outFilePath = getOutFilePath(getCLIApplication(currCmdGenResult))) 
   )
   
@@ -105,111 +112,13 @@ bamToBedAndMergencRNAL = lapply( mappingncRNACLI_cmdResL, function(x){
 })
 
 
+bamToBedAndMerge_execL = list()
 for( i in 1:length(bamToBedAndMergencRNAL)  ){
   for( j in 1:length(bamToBedAndMergencRNAL[[i]])){
     tmpCommandLog = c(tmpCommandLog, getCommandLog(bamToBedAndMergencRNAL[[i]][[j]]) )
+    bamToBedAndMerge_execL = c( bamToBedAndMerge_execL, executeCommandResult(bamToBedAndMergencRNAL[[i]][[j]],  testing=FALSE) )
   }
 }
-
-######################
-# Samtools sorting ncRNAs
-######################
-samToolsSortncRNAmappingL = lapply( mappingncRNACLI_cmdResL, function(x){
-  
-  inFN = getOutResultName(getOutResultReference(x))
-  currPath = getOutFilePath(getCLIApplication(x))
-  
-  ######################
-  # Samtools sort
-  ######################
-  inFN = getOutResultName(getOutResultReference(x))
-  sortSam = Samtools_CLI(inFilePath=currPath, 
-                         inFileNames = inFN,
-                         cliParams =  c(""), 
-                         outputFlag = "_s", 
-                         outFilePath = currPath, 
-                         samtoolsApplication = "sort", 
-                         outputFormat = "bam")
-  sortBamCmdRes = generateCommandResult( object = sortSam )
-  
-  return( sortBamCmdRes )#samViewCmdRes
-} )
-
-for( i in 1:length(samToolsSortncRNAmappingL)  ){
-  tmpCommandLog = c(tmpCommandLog, getCommandLog(samToolsSortncRNAmappingL[[i]]) )
-}
-
-######################
-# Samtools index ncRNAs
-######################
-samToolsIndexncRNAmappingCmdResL = lapply( samToolsSortncRNAmappingL, function(x){
-  
-  inFN = getOutResultName(getOutResultReference(x))
-  currPath = getOutFilePath(getCLIApplication(x))
-  
-  ######################
-  # Samtools sort
-  ######################  
-  samIndex = Samtools_CLI(inFilePath=currPath, 
-                          inFileNames = inFN,
-                          cliParams =  c(""), 
-                          outputFlag = "", 
-                          outFilePath = currPath, 
-                          samtoolsApplication = "index", 
-                          outputFormat = "bai")
-  samIndexCmdRes = generateCommandResult( object = samIndex )
-  
-  return( samIndexCmdRes )#samViewCmdRes
-} )
-
-for( i in 1:length(samToolsIndexncRNAmappingCmdResL)  ){
-  tmpCommandLog = c(tmpCommandLog, getCommandLog(samToolsIndexncRNAmappingCmdResL[[i]]) )
-}
-
-
-######################
-# BedGraph creation of sorted ncRNA mapping files
-######################
-genomeCovNcRNAMapping_plusL = lapply( samToolsSortncRNAmappingL, function(x){
-  ######################
-  # BedGraph Of Sorted Sam Files
-  ######################
-  genomeCovCmdRes = CLIHelperPackage::Genomecov_CLI(inFilePath = getOutFilePath(getCLIApplication(x)), 
-                                                    inFileNames = getOutResultName(getOutResultReference(x)), 
-                                                    cliParams = "-strand + -bg", 
-                                                    outputFlag = ".bedgraph", 
-                                                    outFilePath = getOutFilePath(getCLIApplication(x)), 
-                                                    outFileName = sub(".bam","_plus.bedgraph",getOutResultName(getOutResultReference(x))), 
-                                                    inFileBam = TRUE) 
-  
-  genomeCovCmdRes = generateCommandResult(genomeCovCmdRes)
-  
-  return( genomeCovCmdRes )#samViewCmdRes
-} )
-for( i in 1:length(genomeCovNcRNAMapping_plusL)  ){
-  tmpCommandLog = c(tmpCommandLog, getCommandLog(genomeCovNcRNAMapping_plusL[[i]]) )
-}
-genomeCovNcRNAMapping_minusL = lapply( samToolsSortncRNAmappingL, function(x){
-  ######################
-  # BedGraph Of Sorted Sam Files
-  ######################
-  genomeCovCmdRes = CLIHelperPackage::Genomecov_CLI(inFilePath = getOutFilePath(getCLIApplication(x)), 
-                                                    inFileNames = getOutResultName(getOutResultReference(x)), 
-                                                    cliParams = "-strand - -bg", 
-                                                    outputFlag = ".bedgraph", 
-                                                    outFilePath = getOutFilePath(getCLIApplication(x)), 
-                                                    outFileName = sub(".bam","_minus.bedgraph",getOutResultName(getOutResultReference(x))), 
-                                                    inFileBam = TRUE) 
-  
-  genomeCovCmdRes = generateCommandResult(genomeCovCmdRes)
-  
-  return( genomeCovCmdRes )#samViewCmdRes
-} )
-
-for( i in 1:length(genomeCovNcRNAMapping_minusL)  ){
-  tmpCommandLog = c(tmpCommandLog, getCommandLog(genomeCovNcRNAMapping_minusL[[i]]) )
-}
-
 
 ##########################################################################################################################
 #                   Mapping and assembly of potentially novel ncRNAs
@@ -221,7 +130,8 @@ for( i in 1:length(genomeCovNcRNAMapping_minusL)  ){
 #################################################
 #logging
 tmpCommandLog = c(tmpCommandLog, paste0("\nmkdir ", mappingDir,"\n"))
-
+dir.create(mappingDir)
+# rnaStarGenome_params = paste0(rnaStarGenome_params," -v 30620442512")
 mappingCLI_cmdResL = mapply( function(x, samplePrefix){
   
     outFN =  paste0(sub( ".fastq$","", getInFileNames(getCLIApplication(x))), "_remapped")
@@ -247,6 +157,9 @@ for( i in 1:length(mappingCLI_cmdResL)  ){
   tmpCommandLog = c(tmpCommandLog, getCommandLog(mappingCLI_cmdResL[[i]]) )
 }
 
+mappingWhole_execL = lapply(mappingCLI_cmdResL, function(x){
+  executeCommandResult(x, testing=FALSE)
+})
 ######################
 #   Samtools commands sorting by Name and coordinates _sn and _s
 #   Conversions for later use: 
@@ -315,61 +228,13 @@ samToolsHTSeqCmdL = lapply( mappingCLI_cmdResL, function(x){
 } )
 
 #logging
+samToolsHTSeq_execL = list()
 for( i in 1:length(samToolsHTSeqCmdL)  ){
   for( j in 1:length(samToolsHTSeqCmdL[[i]])){
     tmpCommandLog = c(tmpCommandLog, getCommandLog(samToolsHTSeqCmdL[[i]][[j]]) )
+    samToolsHTSeq_execL = c( samToolsHTSeq_execL, executeCommandResult(samToolsHTSeqCmdL[[i]][[j]],  testing=FALSE) )
   }
 }
-
-######################
-# BedGraph creation of sorted mapping files
-######################
-genomeCovMapping_plusL = lapply( samToolsHTSeqCmdL, function(x){
-  
-  curr = x[[2]]#sortBamCmdRes2
-  ######################
-  # BedGraph Of Sorted Sam Files
-  ######################
-  genomeCovCmdRes = CLIHelperPackage::Genomecov_CLI(inFilePath = getOutFilePath(getCLIApplication(curr)), 
-                                                    inFileNames = getOutResultName(getOutResultReference(curr)), 
-                                                    cliParams = "-strand + -bg", 
-                                                    outputFlag = ".bedgraph", 
-                                                    outFilePath = getOutFilePath(getCLIApplication(curr)), 
-                                                    outFileName = sub(".bam","_plus.bedgraph",getOutResultName(getOutResultReference(curr))), 
-                                                    inFileBam = TRUE) 
-  
-  genomeCovCmdRes = generateCommandResult(genomeCovCmdRes)
-  #   tmpCommandLog = c(tmpCommandLog, getCommandLog(genomeCovCmdRes))
-  
-  return( genomeCovCmdRes )#samViewCmdRes
-} )
-for( i in 1:length(genomeCovMapping_plusL)  ){
-  tmpCommandLog = c(tmpCommandLog, getCommandLog(genomeCovMapping_plusL[[i]]) )
-}
-
-genomeCovMapping_minusL = lapply( samToolsHTSeqCmdL, function(x){
-  
-  curr = x[[2]]#sortBamCmdRes2
-  ######################
-  # BedGraph Of Sorted Sam Files
-  ######################
-  genomeCovCmdRes = CLIHelperPackage::Genomecov_CLI(inFilePath = getOutFilePath(getCLIApplication(curr)), 
-                                                    inFileNames = getOutResultName(getOutResultReference(curr)), 
-                                                    cliParams = "-strand - -bg", 
-                                                    outputFlag = ".bedgraph", 
-                                                    outFilePath = getOutFilePath(getCLIApplication(curr)), 
-                                                    outFileName = sub(".bam","_minus.bedgraph",getOutResultName(getOutResultReference(curr))), 
-                                                    inFileBam = TRUE) 
-  
-  genomeCovCmdRes = generateCommandResult(genomeCovCmdRes)
-  #   tmpCommandLog = c(tmpCommandLog, getCommandLog(genomeCovCmdRes))
-  
-  return( genomeCovCmdRes )#samViewCmdRes
-} )
-for( i in 1:length(genomeCovMapping_minusL)  ){
-  tmpCommandLog = c(tmpCommandLog, getCommandLog(genomeCovMapping_minusL[[i]]) )
-}
-
 
 #############################################
 #     Contig Assembly in each sample
@@ -395,7 +260,7 @@ bamToBedAndMergeL = lapply( samToolsHTSeqCmdL, function(x){
   
   mergeBedFile_CLI_cmdRes = generateCommandResult(MergeBedFile_CLI(inFilePath = getInFilePath(getCLIApplication(currCmdGenResult)), 
                                                                    inFileNames = getOutResultName(getOutResultReference(bamToBed_CLI_cmdRes)), 
-                                                                   cliParams = paste0("-s -d ",readOverlap_contig," -c 4,5,6 -o count,mean,distinct | awk '{if($4 > ",read_threshold,") print }'"), 
+                                                                   cliParams = paste0("-s -d ",readOverlap_contig," -c 4,5,6 -o count,mean,distinct | sed -r 's/(\\s+)?\\S+//4' | awk '{if($4 > ",read_threshold,") print }'"), 
                                                                    outputFlag = "_contigs", outFilePath = getInFilePath(getCLIApplication(currCmdGenResult))) 
   )
   
@@ -403,9 +268,11 @@ bamToBedAndMergeL = lapply( samToolsHTSeqCmdL, function(x){
   return( resL )
 })
 
+bamToBedAndMerge_execL = list()
 for( i in 1:length(bamToBedAndMergeL)  ){
   for( j in 1:length(bamToBedAndMergeL[[i]])){
     tmpCommandLog = c(tmpCommandLog, getCommandLog(bamToBedAndMergeL[[i]][[j]]) )
+    bamToBedAndMerge_execL = c( bamToBedAndMerge_execL, executeCommandResult(bamToBedAndMergeL[[i]][[j]],  testing=FALSE) )
   }
 }
 
@@ -442,16 +309,24 @@ if(grouping){
   groupVect = 1:length(samplesInfo$condition)
   names(groupVect) = unique(samplesInfo$condition)
   groupVect = groupVect[samplesInfo$condition]
-  multiIntersectBed_perl_CLI = MultiIntersectBed_perl_CLI(inFilePath = inFP, inFileNames = inFN, outputFlag = "",withinGroupTH = withinGroupTH, groupVect = groupVect, outFileName = "multiIntersectClust",outFilePath = contigAssemblyDir, perlPath = perlPath)
+  multiIntersectBed_perl_CLI = MultiIntersectBed_perl_CLI(inFilePath = inFP, inFileNames = inFN, outputFlag = "",withinGroupTH = withinGroupTH, groupVect = groupVect, outFileName = "multiIntersectClust",outFilePath = contigAssemblyDir)
 } else{
-  multiIntersectBed_perl_CLI = MultiIntersectBed_perl_CLI(inFilePath = inFP, inFileNames = inFN, outputFlag = "",withinGroupTH = withinGroupTH, outFileName = "multiIntersectClust",outFilePath = contigAssemblyDir, perlPath = perlPath)
+  multiIntersectBed_perl_CLI = MultiIntersectBed_perl_CLI(inFilePath = inFP, inFileNames = inFN, outputFlag = "",withinGroupTH = withinGroupTH, outFileName = "multiIntersectClust",outFilePath = contigAssemblyDir)
 }
 
 tmpCommandLog = c(tmpCommandLog, paste0("\nmkdir ",contigAssemblyDir,"\n") )
+dir.create(contigAssemblyDir)
 multiIntersectBed_perl_CLI_cmdRes = generateCommandResult(multiIntersectBed_perl_CLI)
 tmpCommandLog = c(tmpCommandLog, getCommandLog(multiIntersectBed_perl_CLI_cmdRes) )
+multiIntersectBed_perl_CLI_exec = executeCommandResult(multiIntersectBed_perl_CLI_cmdRes, testing=FALSE)
+
+#Execture sed command to eliminate column 4!
 
 
+sedCmd = paste0("sed -i -r 's/(\\s+)?\\S+//4' ", file.path(multiIntersectBed_perl_CLI_cmdRes@CLIApplication@outFilePath, getOutResultName(getOutResultReference(multiIntersectBed_perl_CLI_cmdRes)))
+)
+tmpCommandLog = c(tmpCommandLog, sedCmd)
+system(sedCmd, intern=TRUE)
 #############################################
 #   Clusering Preparation
 #     Contig Assembly - between samples - MultiIntersectBed
@@ -474,8 +349,11 @@ intersectBed_CLI_cmdResL = lapply( bamToBedAndMergeL, function(x){
 
 tmpCommandLog = c(tmpCommandLog, sapply(intersectBed_CLI_cmdResL, getCommandLog) )
 
+intersectBed_CLI_cmdExecL = lapply( intersectBed_CLI_cmdResL, function(x){
+    executeCommandResult(x,  testing=FALSE)
+})
 #############################################
-#   Clustering Preparation
+#   Clusering Preparation
 #     Contig Assembly - between samples - MultiIntersectBed
 #
 #     Merging these to count the reads and also calculate the genomic uniqueness in each contig
@@ -484,24 +362,17 @@ tmpCommandLog = c(tmpCommandLog, sapply(intersectBed_CLI_cmdResL, getCommandLog)
 mergeBedFile_CLI_cmdResL = lapply(intersectBed_CLI_cmdResL, function(x){
   mergeBedFile_CLI = MergeBedFile_CLI(inFilePath = getOutFilePath(getCLIApplication(x)), 
                                       inFileNames = getOutResultName(getOutResultReference(x)), 
-                                      cliParams = paste0("-s -d ",readOverlap_contig," -c 4,5,6,10 -o count,mean,distinct,distinct"), 
+                                      cliParams = paste0("-s -d ",readOverlap_contig," -c 4,5,6,10 -o count,mean,distinct,distinct | sed -r 's/(\\s+)?\\S+//4'"), 
                                       outputFlag = "_merged", 
                                       outFilePath = getOutFilePath(getCLIApplication(x)))  
   mergeBedFile_CLI_cmdRes = generateCommandResult(mergeBedFile_CLI)
   return(mergeBedFile_CLI_cmdRes)
 })
 
-#Adjusting to the newest BedTools Version, since it is not allowed to have characters in the 7th column in the new version, an awk script changes this!
-#It is inserted after sorting!
-mergeBedFile_CLI_cmdResL = lapply(mergeBedFile_CLI_cmdResL, function(x){
-  cmd = getCommands(x)[2] 
-  cmdSplit = strsplit(cmd, split = "mergeBed")
-  cmd = c("\n",cmdSplit[[1]][1], "awk -v OFS=\'\\t\' \'{gsub(\".*\",\"0\",$7)}1\' | mergeBed",cmdSplit[[1]][2])
-  x@commands[2] = paste0(cmd,collapse="")
-  return(x)
-})
 tmpCommandLog = c(tmpCommandLog, sapply(mergeBedFile_CLI_cmdResL, getCommandLog) )
-
+mergeBedFile_CLI_Exec2L = lapply( mergeBedFile_CLI_cmdResL, function(x){
+  executeCommandResult(mergeBedFile_CLI_cmdResL[[i]],  testing=FALSE)
+})
 
 #######################################
 #   Clusering Preparation
@@ -528,6 +399,9 @@ intersectBed_CLI_clust_cmdResL = lapply( bamToBedAndMergeL[subVect], function(x)
 
 tmpCommandLog = c(tmpCommandLog, sapply(intersectBed_CLI_clust_cmdResL, getCommandLog) )
 
+intersectBedClust_CLI_cmdExecL = lapply( intersectBed_CLI_clust_cmdResL, function(x){
+  executeCommandResult(x,  testing=FALSE)
+})
 
 ###################################################
 # Concatenate files to obtain the file containing reads for clustering
@@ -541,6 +415,9 @@ readsForClustering_cmdL = lapply(intersectBed_CLI_clust_cmdResL, function(x){
   }
 })
 tmpCommandLog = c(tmpCommandLog, unlist(readsForClustering_cmdL) )
+readsForClustering_cmdExecL = lapply( readsForClustering_cmdL, function(x){
+  system(x, intern=TRUE)
+})
 
 
 ######################################
@@ -557,16 +434,6 @@ system(paste0("bash ", commandLog, " > ", executionLog ))
 cmdExecTime = proc.time() - cmdExecTime
 cmdExecTime
 
-ncRNAreadCountDF = tryCatch({  
-  ncRNAreadCountDF = generateCountFromMappingDF(bamToBedAndMergencRNAL, samplesInfo=samplesInfo)  
-  write.table( ncRNAreadCountDF, file.path(readCountsDir, "ncRNAreadCountDF.csv"), sep="\t", col.names=TRUE, row.names=TRUE )
-}, warning = function(w) {
-  message(w)
-}, error = function(e) {
-  message(e)
-}, finally = {
-  ncRNAreadCountDF = NULL
-})
 
 ########################################################################################################################################################
 #                                                                       Contig clustering
@@ -654,13 +521,22 @@ inFN = file.path( sapply( mappingCLI_cmdResL,function(x){getOutFilePath(getCLIAp
 multiBamCov_CLI = MultiBamCov_CLI(inFilePath = "", 
                                   inFileNames = inFN,
                                   cliParams =  c("-s -f 0.05 -D"), # -q 20 quality values not supported rna-star output! -D include duplicated reads 0.05 ~1bp at length 200 - 10 bp -> only good for short read data! 
-                                  outputFlag = "contigsCountDF.csv", 
+                                  outputFlag = "_multibamcov", 
                                   outFilePath = readCountsDir,
                                   annotationFileMB = file.path(contigClusterDir,clusteredContigsFN), 
                                   annotationType = "bed")
 
 multiBamCov_CLI_cmdRes = generateCommandResult( object = multiBamCov_CLI )
 commandLogCounting = c(commandLogCounting, getCommandLog(multiBamCov_CLI_cmdRes) )
+
+
+# rownames(count_contigsDF ) = count_contigsDF$contigID
+# rownames(ensReadsCountDF_clustered ) = ensReadsCountDF_clustered$UID
+# counts = ensReadsCountDF_clustered[,3:(2+length(samplesInfo$condition))]
+# counts = rbind(counts, count_contigsDF[,7:dim(count_contigsDF)[2]])
+# counts_tmp = as.data.frame(apply(counts, 2, as.numeric))
+# rownames(counts_tmp) = rownames(counts)
+
 
 setwd(rootDir)
 sapply( commandLogCounting, system)
