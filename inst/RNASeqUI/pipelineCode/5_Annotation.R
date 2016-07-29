@@ -1,11 +1,21 @@
 print("Annotation")
+###################################
+#   PATH definitions - theese need to be changed!
+###################################
+
+args <- commandArgs(TRUE)
+if( length(args) == 0 ){
+  load( file.path(getwd(),"Configuration.rda") )
+} else{
+  load(file.path(args[1],"Configuration.rda"))
+}
 
 options(stringsAsFactors = FALSE)
 setwd(rootDir)
 load(file.path( rootDir,"MappingAssemblyClustering.rda"))#
 
 
-#require(sncRNAannotation)
+library(sncRNAannotation)
 # require(reshape2)
 require(rtracklayer)
 # require(ggplot2)
@@ -31,7 +41,7 @@ library(RNASeqUtility)
 switch(organismForAnnotation, 
        hg19={
          print('hg19')
-         ensembl=useMart("ensembl")
+         ensembl=useMart("ENSEMBL_MART_ENSEMBL",host = "www.ensembl.org")
          ensemblMart = useDataset("hsapiens_gene_ensembl",mart=ensembl)
          ensemblAttributes = c("ensembl_transcript_id","ensembl_gene_id","gene_biotype","external_gene_name","rfam",
                                "chromosome_name","start_position","end_position","strand",
@@ -42,7 +52,7 @@ switch(organismForAnnotation,
        },
        hg38={
          print('hg38')
-         ensembl=useMart("ensembl")
+         ensembl=useMart("ENSEMBL_MART_ENSEMBL", host = "www.ensembl.org")
          ensemblMart = useDataset("hsapiens_gene_ensembl",mart=ensembl)
          ensemblAttributes = c("ensembl_transcript_id","ensembl_gene_id","gene_biotype","external_gene_name","rfam",
                                "chromosome_name","start_position","end_position","strand",
@@ -53,7 +63,7 @@ switch(organismForAnnotation,
        },
        mm10={
          print('mm10')
-         ensembl=useMart("ensembl")
+         ensembl=useMart("ENSEMBL_MART_ENSEMBL", host = "www.ensembl.org")
          ensemblMart = useDataset("mmusculus_gene_ensembl",mart=ensembl)
          ensemblAttributes=c("ensembl_transcript_id","ensembl_gene_id","gene_biotype","external_gene_name","rfam",
                              "chromosome_name","start_position","end_position","strand",
@@ -65,7 +75,7 @@ switch(organismForAnnotation,
        }, 
        mm9={
          print('mm9')
-         ensembl=useMart("ensembl")
+         ensembl=useMart("ENSEMBL_MART_ENSEMBL", host = "www.ensembl.org")
          ensemblMart = useDataset("mmusculus_gene_ensembl",mart=ensembl)
          ensemblAttributes=c("ensembl_transcript_id","ensembl_gene_id","gene_biotype","external_gene_name","rfam",
                              "chromosome_name","start_position","end_position","strand",
@@ -92,7 +102,7 @@ seqlevelsStyle(bsgenome) = "UCSC" #This sets the chrodomosome coordinates from E
 ###############################################################################################
 ncRNAReadCountL = lapply( bamToBedAndMergencRNAL, function(x){
   x = x[[2]]
-  return( import( file.path( getOutFilePath(getCLIApplication(x)),getOutResultName(getOutResultReference(x))), format="BED",asRangedData=FALSE ) )
+  return( import( file.path( getOutFilePath(getCLIApplication(x)),getOutResultName(getOutResultReference(x))),asRangedData=FALSE ) )
 })
 
 #Subset These to Ensembl only
@@ -278,6 +288,7 @@ ensembl_featureAnnot$featureAnnot_short = featureAnnot_short
 table(ensembl_featureAnnot$featureAnnot_short)
 
 #Repeat Masker Annotation
+
 rpmskr_annot = GRangesBasedAnnotation("repeatMasker", repeatMaskerDir, repeatMaskerFN,
                                       contigForCountingGR_clustered)
 rpmskr_annotDF = annotationSummary(rpmskr_annot)
