@@ -26,7 +26,7 @@ bamToBedAndMergeL = lapply( samToolsHTSeqCmdL, function(x){
   
   mergeBedFile_CLI_cmdRes = generateCommandResult(MergeBedFile_CLI(inFilePath = getInFilePath(getCLIApplication(currCmdGenResult)), 
                                                                    inFileNames = getOutResultName(getOutResultReference(bamToBed_CLI_cmdRes)), 
-                                                                   cliParams = paste0("-s -d ",readOverlap_contig," -c 4,5,6 -o count,mean,distinct | sed -r 's/(\\s+)?\\S+//4' | awk '{if($4 > ",read_threshold,") print }'"), 
+                                                                   cliParams = paste0("-s -d ",readOverlap_contig," -c 4,5,6 -o count,mean,distinct", bedTools225Sed, " | awk '{if($4 > ",read_threshold,") print }'"), 
                                                                    outputFlag = "_contigs", outFilePath = getInFilePath(getCLIApplication(currCmdGenResult))) 
   )
   
@@ -88,11 +88,12 @@ multiIntersectBed_perl_CLI_exec = executeCommandResult(multiIntersectBed_perl_CL
 
 #Execture sed command to eliminate column 4!
 
-
-sedCmd = paste0("sed -i -r 's/(\\s+)?\\S+//4' ", file.path(multiIntersectBed_perl_CLI_cmdRes@CLIApplication@outFilePath, getOutResultName(getOutResultReference(multiIntersectBed_perl_CLI_cmdRes)))
-)
-tmpCommandLog = c(tmpCommandLog, sedCmd)
-system(sedCmd, intern=TRUE)
+if(bedTools225){
+  sedCmd = paste0("sed -i -r 's/(\\s+)?\\S+//4' ", file.path(multiIntersectBed_perl_CLI_cmdRes@CLIApplication@outFilePath, getOutResultName(getOutResultReference(multiIntersectBed_perl_CLI_cmdRes)))
+  )
+  tmpCommandLog = c(tmpCommandLog, sedCmd)
+  system(sedCmd, intern=TRUE)
+}
 #############################################
 #   Clusering Preparation
 #     Contig Assembly - between samples - MultiIntersectBed
@@ -128,7 +129,7 @@ intersectBed_CLI_cmdExecL = lapply( intersectBed_CLI_cmdResL, function(x){
 mergeBedFile_CLI_cmdResL = lapply(intersectBed_CLI_cmdResL, function(x){
   mergeBedFile_CLI = MergeBedFile_CLI(inFilePath = getOutFilePath(getCLIApplication(x)), 
                                       inFileNames = getOutResultName(getOutResultReference(x)), 
-                                      cliParams = paste0("-s -d ",readOverlap_contig," -c 4,5,6,10 -o count,mean,distinct,distinct | sed -r 's/(\\s+)?\\S+//4'"), 
+                                      cliParams = paste0("-s -d ",readOverlap_contig," -c 4,5,6,10 -o count,mean,distinct,distinct",bedTools225Sed), 
                                       outputFlag = "_merged", 
                                       outFilePath = getOutFilePath(getCLIApplication(x)))  
   mergeBedFile_CLI_cmdRes = generateCommandResult(mergeBedFile_CLI)

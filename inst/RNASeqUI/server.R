@@ -156,7 +156,7 @@ shinyServer(function(input, output, session) {
     #############################
     withProgress( message = '',min = 0, max = 1, value=0,{
       
-      
+      runCutAdapt = input$config_cutadaptRun
       
       setwd(input$config_rootDir)
       source(file.path(input$config_rootDir, "Configuration_ncRNA.R"), local = TRUE)$value

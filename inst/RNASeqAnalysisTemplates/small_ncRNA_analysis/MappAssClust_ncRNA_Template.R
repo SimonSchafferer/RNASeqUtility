@@ -35,14 +35,26 @@ tmpCommandLog = ""
 #######################
 #   Cutadapt to trim the fastq files cutadaptOptions are defined in the configuration file
 #######################
-cutAdaptCLI = Cutadapt_CLI(inFilePath=rawDataDir, cliParams =  cutadaptOptions, outputFlag = "_trimmed", 
-                           outFilePath = file.path(rootDir,"rawDataTrimmed") )
-cutAdatptCLI_cmdRes = generateCommandResult(object = cutAdaptCLI )
-#logging
-tmpCommandLog = getCommandLog(cutAdatptCLI_cmdRes)
+runCutAdapt = TRUE
+bedTools225 = TRUE
+if(bedTools225){
+  bedTools225Sed = " | sed -r 's/(\\s+)?\\S+//4'"
+} else{
+  bedTools225Sed = ""
+}
 
-#Execute Cutadapt
-cutAdatptCLI_execRes = executeCommandResult(cutAdatptCLI_cmdRes, testing=FALSE)
+
+if(runCutAdapt){
+  cutAdaptCLI = Cutadapt_CLI(inFilePath=rawDataDir, cliParams =  cutadaptOptions, outputFlag = "_trimmed", 
+                             outFilePath = file.path(rootDir,"rawDataTrimmed") )
+  cutAdatptCLI_cmdRes = generateCommandResult(object = cutAdaptCLI )
+  #logging
+  tmpCommandLog = getCommandLog(cutAdatptCLI_cmdRes)
+  
+  #Execute Cutadapt
+  cutAdatptCLI_execRes = executeCommandResult(cutAdatptCLI_cmdRes, testing=FALSE)
+}
+
 
 #############################################################
 #     Mapping ncRNAs to the ENSEMBL ncRNA fasta file
@@ -59,7 +71,13 @@ mappingncRNACLI_cmdResL = mapply( function(fqf, samplePrefix){
   outFN = sub(".fastq","",fqf)
   outFP = file.path( ncRNAmappingDir, outFN )
   
-  mappingCLI = RNAStar_CLI(inFilePath = getOutFilePath(getCLIApplication(cutAdatptCLI_cmdRes)), 
+  if(runCutAdapt){
+    inFilePath = getOutFilePath(getCLIApplication(cutAdatptCLI_cmdRes))
+  } else{
+    inFilePath = rawDataDir
+  }
+  
+  mappingCLI = RNAStar_CLI(inFilePath = inFilePath, 
                            inFileNames = fqf, 
                            cliParams = rnaStarncRNA_params, 
                            outputFlag = paste0(outFN,"_"), #prefix -> must be distinguishable -> best to use the fastQFileNames ,or the sample Short Names!!
@@ -103,7 +121,7 @@ bamToBedAndMergencRNAL = lapply( mappingncRNACLI_cmdResL, function(x){
   
   mergeBedFile_CLI_cmdRes = generateCommandResult(MergeBedFile_CLI(inFilePath = getOutFilePath(getCLIApplication(currCmdGenResult)), 
                                                                    inFileNames = getOutResultName(getOutResultReference(bamToBed_CLI_cmdRes)), 
-                                                                   cliParams = paste0("-s -d ",readOverlap_contig," -c 4,5,6 -o count,mean,distinct  | sed -r 's/(\\s+)?\\S+//4'"), 
+                                                                   cliParams = paste0("-s -d ",readOverlap_contig," -c 4,5,6 -o count,mean,distinct", bedTools225Sed), 
                                                                    outputFlag = "_counted", outFilePath = getOutFilePath(getCLIApplication(currCmdGenResult))) 
   )
   
@@ -134,10 +152,10 @@ dir.create(mappingDir)
 # rnaStarGenome_params = paste0(rnaStarGenome_params," -v 30620442512")
 mappingCLI_cmdResL = mapply( function(x, samplePrefix){
   
-    outFN =  paste0(sub( ".fastq$","", getInFileNames(getCLIApplication(x))), "_remapped")
-    outFP = file.path( mappingDir, outFN )
-    inFN = paste0(getOutputFlag(getCLIApplication(x)),"Unmapped.out.mate1")
-    
+  outFN =  paste0(sub( ".fastq$","", getInFileNames(getCLIApplication(x))), "_remapped")
+  outFP = file.path( mappingDir, outFN )
+  inFN = paste0(getOutputFlag(getCLIApplication(x)),"Unmapped.out.mate1")
+  
   mappingCLI = RNAStar_CLI(inFilePath = getOutFilePath(getCLIApplication(x)), 
                            inFileNames = inFN, 
                            cliParams = rnaStarGenome_params,
@@ -260,7 +278,7 @@ bamToBedAndMergeL = lapply( samToolsHTSeqCmdL, function(x){
   
   mergeBedFile_CLI_cmdRes = generateCommandResult(MergeBedFile_CLI(inFilePath = getInFilePath(getCLIApplication(currCmdGenResult)), 
                                                                    inFileNames = getOutResultName(getOutResultReference(bamToBed_CLI_cmdRes)), 
-                                                                   cliParams = paste0("-s -d ",readOverlap_contig," -c 4,5,6 -o count,mean,distinct | sed -r 's/(\\s+)?\\S+//4' | awk '{if($4 > ",read_threshold,") print }'"), 
+                                                                   cliParams = paste0("-s -d ",readOverlap_contig," -c 4,5,6 -o count,mean,distinct", bedTools225Sed, " | awk '{if($4 > ",read_threshold,") print }'"), 
                                                                    outputFlag = "_contigs", outFilePath = getInFilePath(getCLIApplication(currCmdGenResult))) 
   )
   
@@ -322,11 +340,12 @@ multiIntersectBed_perl_CLI_exec = executeCommandResult(multiIntersectBed_perl_CL
 
 #Execture sed command to eliminate column 4!
 
-
-sedCmd = paste0("sed -i -r 's/(\\s+)?\\S+//4' ", file.path(multiIntersectBed_perl_CLI_cmdRes@CLIApplication@outFilePath, getOutResultName(getOutResultReference(multiIntersectBed_perl_CLI_cmdRes)))
-)
-tmpCommandLog = c(tmpCommandLog, sedCmd)
-system(sedCmd, intern=TRUE)
+if(bedTools225){
+  sedCmd = paste0("sed -i -r 's/(\\s+)?\\S+//4' ", file.path(multiIntersectBed_perl_CLI_cmdRes@CLIApplication@outFilePath, getOutResultName(getOutResultReference(multiIntersectBed_perl_CLI_cmdRes)))
+  )
+  tmpCommandLog = c(tmpCommandLog, sedCmd)
+  system(sedCmd, intern=TRUE)
+}
 #############################################
 #   Clusering Preparation
 #     Contig Assembly - between samples - MultiIntersectBed
@@ -350,7 +369,7 @@ intersectBed_CLI_cmdResL = lapply( bamToBedAndMergeL, function(x){
 tmpCommandLog = c(tmpCommandLog, sapply(intersectBed_CLI_cmdResL, getCommandLog) )
 
 intersectBed_CLI_cmdExecL = lapply( intersectBed_CLI_cmdResL, function(x){
-    executeCommandResult(x,  testing=FALSE)
+  executeCommandResult(x,  testing=FALSE)
 })
 #############################################
 #   Clusering Preparation
@@ -362,7 +381,7 @@ intersectBed_CLI_cmdExecL = lapply( intersectBed_CLI_cmdResL, function(x){
 mergeBedFile_CLI_cmdResL = lapply(intersectBed_CLI_cmdResL, function(x){
   mergeBedFile_CLI = MergeBedFile_CLI(inFilePath = getOutFilePath(getCLIApplication(x)), 
                                       inFileNames = getOutResultName(getOutResultReference(x)), 
-                                      cliParams = paste0("-s -d ",readOverlap_contig," -c 4,5,6,10 -o count,mean,distinct,distinct | sed -r 's/(\\s+)?\\S+//4'"), 
+                                      cliParams = paste0("-s -d ",readOverlap_contig," -c 4,5,6,10 -o count,mean,distinct,distinct",bedTools225Sed), 
                                       outputFlag = "_merged", 
                                       outFilePath = getOutFilePath(getCLIApplication(x)))  
   mergeBedFile_CLI_cmdRes = generateCommandResult(mergeBedFile_CLI)

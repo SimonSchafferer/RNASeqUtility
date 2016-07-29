@@ -1,9 +1,6 @@
 print("Mapping to ncRNA Genome")
 
 options(stringsAsFactors = FALSE)
-setwd(rootDir)
-library(CLIHelperPackage)
-library(RNASeqUtility)
 
 #############################################################
 #     Mapping ncRNAs to the ENSEMBL ncRNA fasta file
@@ -20,7 +17,13 @@ mappingncRNACLI_cmdResL = mapply( function(fqf, samplePrefix){
   outFN = sub(".fastq","",fqf)
   outFP = file.path( ncRNAmappingDir, outFN )
   
-  mappingCLI = RNAStar_CLI(inFilePath = getOutFilePath(getCLIApplication(cutAdatptCLI_cmdRes)), 
+  if(runCutAdapt){
+    inFilePath = getOutFilePath(getCLIApplication(cutAdatptCLI_cmdRes))
+  } else{
+    inFilePath = rawDataDir
+  }
+  
+  mappingCLI = RNAStar_CLI(inFilePath = inFilePath, 
                            inFileNames = fqf, 
                            cliParams = rnaStarncRNA_params, 
                            outputFlag = paste0(outFN,"_"), #prefix -> must be distinguishable -> best to use the fastQFileNames ,or the sample Short Names!!
@@ -43,6 +46,7 @@ mappingncRNACLI_execResL = lapply( mappingncRNACLI_cmdResL, function(x){
   executeCommandResult(mappingncRNACLI_cmdResL[[i]],  testing=FALSE)
 })
 
+
 #############################################################
 #     Read counting by bamToBed and mergeBed
 #     Writing bam files to bed files by extracting the <NH> tag (number of multiple mappings) from the bam file. 
@@ -63,7 +67,7 @@ bamToBedAndMergencRNAL = lapply( mappingncRNACLI_cmdResL, function(x){
   
   mergeBedFile_CLI_cmdRes = generateCommandResult(MergeBedFile_CLI(inFilePath = getOutFilePath(getCLIApplication(currCmdGenResult)), 
                                                                    inFileNames = getOutResultName(getOutResultReference(bamToBed_CLI_cmdRes)), 
-                                                                   cliParams = paste0("-s -d ",readOverlap_contig," -c 4,5,6 -o count,mean,distinct  | sed -r 's/(\\s+)?\\S+//4'"), 
+                                                                   cliParams = paste0("-s -d ",readOverlap_contig," -c 4,5,6 -o count,mean,distinct", bedTools225Sed), 
                                                                    outputFlag = "_counted", outFilePath = getOutFilePath(getCLIApplication(currCmdGenResult))) 
   )
   
@@ -79,4 +83,3 @@ for( i in 1:length(bamToBedAndMergencRNAL)  ){
     bamToBedAndMerge_execL = c( bamToBedAndMerge_execL, executeCommandResult(bamToBedAndMergencRNAL[[i]][[j]],  testing=FALSE) )
   }
 }
-
