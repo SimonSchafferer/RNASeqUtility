@@ -21,8 +21,8 @@ require(rtracklayer)
 require(biomaRt)
 #Range based annotation 
 #Fetch sequences from genome
-#library(CLIHelperPackage)
 library(RNASeqUtility)
+library(CLIHelperPackage) 
 # available.genomes()
 # source("http://bioconductor.org/biocLite.R")
 # biocLite("BSgenome.Hsapiens.NCBI.GRCh38")
