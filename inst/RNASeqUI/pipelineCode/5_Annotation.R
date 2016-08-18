@@ -22,7 +22,7 @@ require(rtracklayer)
 require(biomaRt)
 #Range based annotation 
 #Fetch sequences from genome
-#library(CLIHelperPackage)
+library(CLIHelperPackage)
 library(RNASeqUtility)
 # available.genomes()
 # source("http://bioconductor.org/biocLite.R")
