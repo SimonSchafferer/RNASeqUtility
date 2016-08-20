@@ -340,12 +340,12 @@ multiIntersectBed_perl_CLI_exec = executeCommandResult(multiIntersectBed_perl_CL
 
 #Execture sed command to eliminate column 4!
 
-if(bedTools225){
-  sedCmd = paste0("sed -i -r 's/(\\s+)?\\S+//4' ", file.path(multiIntersectBed_perl_CLI_cmdRes@CLIApplication@outFilePath, getOutResultName(getOutResultReference(multiIntersectBed_perl_CLI_cmdRes)))
-  )
-  tmpCommandLog = c(tmpCommandLog, sedCmd)
-  system(sedCmd, intern=TRUE)
-}
+#if(bedTools225){
+#  sedCmd = paste0("sed -i -r 's/(\\s+)?\\S+//4' ", file.path(multiIntersectBed_perl_CLI_cmdRes@CLIApplication@outFilePath, getOutResultName(getOutResultReference(multiIntersectBed_perl_CLI_cmdRes)))
+#  )
+#  tmpCommandLog = c(tmpCommandLog, sedCmd)
+#  system(sedCmd, intern=TRUE)
+#}
 #############################################
 #   Clusering Preparation
 #     Contig Assembly - between samples - MultiIntersectBed
