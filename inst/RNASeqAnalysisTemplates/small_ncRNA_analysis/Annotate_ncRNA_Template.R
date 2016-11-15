@@ -101,7 +101,7 @@ seqlevelsStyle(bsgenome) = "UCSC" #This sets the chrodomosome coordinates from E
 ###############################################################################################
 ncRNAReadCountL = lapply( bamToBedAndMergencRNAL, function(x){
   x = x[[2]]
-  return( import( file.path( getOutFilePath(getCLIApplication(x)),getOutResultName(getOutResultReference(x))),asRangedData=FALSE ) )
+  return( import( file.path( getOutFilePath(getCLIApplication(x)),getOutResultName(getOutResultReference(x))) ) )
 })
 
 #Subset These to Ensembl only
@@ -194,7 +194,7 @@ table(ensReadsCountDF_clustered$gene_biotype)
 #     Other ncRNAs (miRNAs, snoRNAs)
 ####################################
 otherncRNAReadCountL = lapply(ncRNAReadCountL, function(x){
-  x[-grep("ENS.*",seqnames(x))]
+  x[!grepl("ENS.*",seqnames(x))]
 })
 
 #Check if non-ensembl genes are present
