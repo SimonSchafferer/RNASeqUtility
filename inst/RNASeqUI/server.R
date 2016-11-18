@@ -82,7 +82,7 @@ shinyServer(function(input, output, session) {
     valDecl("read_threshold",input$config_read_threshold),
     valDecl("readOverlap_contig",input$config_readOverlap_contig),
     valDecl("readCompositionIdentity",input$config_readCompositionIdentity),
-    paste0("samplesInfo = read.csv(\"",file.path(input$config_rootDir, "SamplesInfo.txt"),"\", header=TRUE, sep=",")"),
+    paste0("samplesInfo = read.csv(\"",file.path(input$config_rootDir, "SamplesInfo.txt"),"\", stringsAsFactors=FALSE, header=TRUE, sep=",")"),
     paste0("diffExpFormula = with(samplesInfo,",input$config_diffExpFormula,")"),
     txtDecl("perlPath",input$config_perlPath),
     txtDecl("cutadaptOptions",input$config_cutadaptOptions),
