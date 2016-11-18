@@ -131,7 +131,7 @@ diffExpDir = file.path(rootDir,"diffExpAnalysis")
 dir.create(diffExpDir)
 
 #Name and Path of the tab separated file containing the sample information
-samplesInfo = read.table(file=file.path(rootDir, "samplesInfo.csv"), sep="\t", header=TRUE) #should contain cloumn condition and column sample name
+samplesInfo = read.table(file=file.path(rootDir, "samplesInfo.csv"), sep="\t", header=TRUE, stringsAsFactors=FALSE) #should contain cloumn condition and column sample name
 if(!( "sampleName" %in% colnames(samplesInfo) & "condition"%in% colnames(samplesInfo))) {stop("Please provide a sampleInfo file with column condition and column sampleName")}
 
 diffExpFormula = with(samplesInfo,~condition)
