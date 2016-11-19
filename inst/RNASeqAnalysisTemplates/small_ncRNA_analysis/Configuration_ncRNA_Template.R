@@ -28,7 +28,7 @@ infernalDB = file.path("/media/schaffrr/SimonsDrive1TB/backup","simon","dbsOffli
 #Path to repeat masker file (Please see below for further information)
 repeatMaskerDir = "/media/schaffrr/SimonsDrive1TB/backup/simon/dbsOfflineUse/HomoSapiens/hg19/repeatMskr"
 #Name of the repeat masker file (either .rda (see sncRNAannotation package) or bed file!)
-repeatMaskerFN = "rmsk_hg19.bed" #or GRanges object
+repeatMaskerFN = "rpmsk_hg19.rda" #or GRanges object
 
 #Assembly of Annotation:
 organismForAnnotation = "hg19" #
