@@ -445,13 +445,13 @@ readsForClustering_cmdExecL = lapply( readsForClustering_cmdL, function(x){
 cat(tmpCommandLog,  file = commandLog, append = FALSE) 
 save.image(file.path(rootDir,"CommandsBeforeClustering.rda"))
 ######################################
-#       Execute commands!
+#       Execute commands! (already executed -> if test = TRUE in the above examples then this could be uncommented)
 ######################################
-cmdExecTime = proc.time()
-setwd(rootDir)
-system(paste0("bash ", commandLog, " > ", executionLog ))
-cmdExecTime = proc.time() - cmdExecTime
-cmdExecTime
+# cmdExecTime = proc.time()
+# setwd(rootDir)
+# system(paste0("bash ", commandLog, " > ", executionLog ))
+# cmdExecTime = proc.time() - cmdExecTime
+# cmdExecTime
 
 
 ########################################################################################################################################################
